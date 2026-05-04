@@ -19,19 +19,34 @@ function LoginForm() {
     setLoading(true)
     setError('')
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    console.log('[login] env check — url:', url ? url.slice(0, 30) + '…' : 'MISSING', 'key:', key ? 'present' : 'MISSING')
 
-    const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
-    if (authErr) {
-      setError(authErr.message)
+    if (!url || !key) {
+      setError('Configuration error: Supabase env vars missing. Check Vercel environment settings.')
       setLoading(false)
       return
     }
 
-    router.push('/dashboard')
+    try {
+      const supabase = createClient(url, key)
+      console.log('[login] calling signInWithPassword…')
+      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      console.log('[login] result — error:', authErr?.message ?? 'none', 'user:', data?.user?.id ?? 'none')
+
+      if (authErr) {
+        setError(authErr.message)
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard')
+    } catch (err: any) {
+      console.error('[login] unexpected error:', err)
+      setError(err?.message ?? 'Unexpected error — check console')
+      setLoading(false)
+    }
   }
 
   return (
