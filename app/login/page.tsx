@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
@@ -19,21 +19,12 @@ function LoginForm() {
     setLoading(true)
     setError('')
 
-    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const key  = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    console.log('[login] env check — url:', url ? url.slice(0, 30) + '…' : 'MISSING', 'key:', key ? 'present' : 'MISSING')
-
-    if (!url || !key) {
-      setError('Configuration error: Supabase env vars missing. Check Vercel environment settings.')
-      setLoading(false)
-      return
-    }
-
     try {
-      const supabase = createClient(url, key)
-      console.log('[login] calling signInWithPassword…')
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
-      console.log('[login] result — error:', authErr?.message ?? 'none', 'user:', data?.user?.id ?? 'none')
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const { error: authErr } = await supabase.auth.signInWithPassword({ email, password })
 
       if (authErr) {
         setError(authErr.message)
@@ -43,8 +34,7 @@ function LoginForm() {
 
       router.push('/dashboard')
     } catch (err: any) {
-      console.error('[login] unexpected error:', err)
-      setError(err?.message ?? 'Unexpected error — check console')
+      setError(err?.message ?? 'Unexpected error')
       setLoading(false)
     }
   }
