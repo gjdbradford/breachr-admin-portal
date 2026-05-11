@@ -165,7 +165,7 @@ export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode,
             <span style={{ color: '#64748b', fontSize: 10 }}>{entry.changes_summary}</span>
             <span style={{ color: '#94a3b8' }}>{entry.pushed_by}</span>
             <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: entry.status === 'success' ? 'rgba(34,197,94,.1)' : entry.status === 'redacted' ? 'rgba(245,158,11,.1)' : 'rgba(239,68,68,.1)', color: entry.status === 'success' ? '#22c55e' : entry.status === 'redacted' ? '#f59e0b' : '#ef4444', textTransform: 'uppercase', letterSpacing: '.04em', display: 'inline-block' }}>{entry.status}</span>
-            <span>{entry.status === 'redacted' && <button onClick={() => {}} style={{ fontSize: 10, color: '#42a5f5', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Restore</button>}</span>
+            <span />
           </div>
         ))}
         {localLog.length === 0 && (

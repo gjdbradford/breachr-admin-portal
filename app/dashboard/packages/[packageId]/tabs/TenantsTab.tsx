@@ -14,6 +14,7 @@ export default function TenantsTab({ packageId, allPackages }: Props) {
   const [tenants, setTenants] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [reassigning, startReassign] = useTransition()
+  const [reassignError, setReassignError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!packageId) return
@@ -29,8 +30,12 @@ export default function TenantsTab({ packageId, allPackages }: Props) {
 
   function handleReassign(tenantId: string, newPkgId: string) {
     startReassign(async () => {
-      await reassignTenantAction(tenantId, newPkgId)
-      setTenants(prev => prev.filter(t => t.tenant?.id !== tenantId))
+      const result = await reassignTenantAction(tenantId, newPkgId)
+      if (result.error) {
+        setReassignError(result.error)
+      } else {
+        setTenants(prev => prev.filter(t => t.tenant?.id !== tenantId))
+      }
     })
   }
 
@@ -41,6 +46,7 @@ export default function TenantsTab({ packageId, allPackages }: Props) {
           {tenants.length} tenants on this package
         </div>
       </div>
+      {reassignError && <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 10 }}>{reassignError}</div>}
       {tenants.length === 0 ? (
         <div style={{ fontSize: 12, color: '#475569', padding: '20px 0' }}>No tenants assigned yet.</div>
       ) : (
