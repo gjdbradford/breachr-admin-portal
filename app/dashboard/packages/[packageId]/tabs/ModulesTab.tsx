@@ -55,8 +55,12 @@ export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode,
   }
 
   async function handleRedact(logId: string) {
-    await redactLogEntryAction(logId)
+    const rollback = localLog.find(l => l.id === logId)
     setLocalLog(prev => prev.map(l => l.id === logId ? { ...l, status: 'redacted' as const, redacted_at: new Date().toISOString() } : l))
+    const result = await redactLogEntryAction(logId)
+    if (result.error && rollback) {
+      setLocalLog(prev => prev.map(l => l.id === logId ? rollback : l))
+    }
   }
 
   const stagingState  = envSyncState(localLog, 'staging', updatedAt)
