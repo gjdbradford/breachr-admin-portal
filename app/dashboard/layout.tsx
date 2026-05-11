@@ -36,6 +36,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/dashboard/voice" className="nav-item">◎ Customer Voice</Link>
           <Link href="/dashboard/gdpr" className="nav-item">⚖ GDPR & Cancellations</Link>
 
+          <div className="nav-section" style={{ marginTop: 8 }}>Product Config</div>
+          <Link href="/dashboard/packages" className="nav-item">⬡ Packages</Link>
+
           <div className="nav-section" style={{ marginTop: 8 }}>Red Team</div>
           <Link href="/dashboard/redteam" className="nav-item">⚔ Engagements</Link>
 
