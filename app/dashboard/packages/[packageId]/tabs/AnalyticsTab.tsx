@@ -14,6 +14,7 @@ type Analytics = {
 export default function AnalyticsTab({ packageId }: { packageId: string | null }) {
   const [data, setData] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!packageId) return
@@ -21,10 +22,11 @@ export default function AnalyticsTab({ packageId }: { packageId: string | null }
     fetch(`/api/admin/packages/${packageId}/analytics`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setFetchError('Failed to load analytics'); setLoading(false) })
   }, [packageId])
 
   if (!packageId) return <div style={{ color: '#475569', fontSize: 12 }}>Save the package first.</div>
+  if (fetchError) return <div style={{ color: '#ef4444', fontSize: 12 }}>{fetchError}</div>
   if (loading || !data) return <div style={{ color: '#475569', fontSize: 12 }}>Loading analytics…</div>
 
   const mrr = data.mrr / 100
