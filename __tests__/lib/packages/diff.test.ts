@@ -75,4 +75,25 @@ describe('buildChangesSummary', () => {
     expect(result).toContain('scans_limit')
     expect(result).toContain('exports')
   })
+
+  it('reports added module', () => {
+    const after = [
+      ...baseMods,
+      { id: '4', package_id: 'p1', module_slug: 'remediation' as const, access_mode: 'full' as const, trial_days: null },
+    ]
+    const result = buildChangesSummary(
+      { pkg: basePkg as Package, modules: baseMods },
+      { pkg: basePkg as Package, modules: after },
+    )
+    expect(result).toBe('remediation added as full')
+  })
+
+  it('reports removed module', () => {
+    const after = baseMods.filter(m => m.module_slug !== 'exports')
+    const result = buildChangesSummary(
+      { pkg: basePkg as Package, modules: baseMods },
+      { pkg: basePkg as Package, modules: after },
+    )
+    expect(result).toBe('exports removed')
+  })
 })

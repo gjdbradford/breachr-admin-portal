@@ -1,9 +1,11 @@
 import type { Package, PackageModule } from './types'
 
-const TRACKED_FIELDS = [
+type TrackedField = 'name' | 'price_monthly' | 'price_annual' | 'scans_limit' | 'tokens_limit' | 'targets_limit' | 'status'
+
+const TRACKED_FIELDS: TrackedField[] = [
   'name', 'price_monthly', 'price_annual',
   'scans_limit', 'tokens_limit', 'targets_limit', 'status',
-] as const
+]
 
 export function buildChangesSummary(
   before: { pkg: Package; modules: PackageModule[] } | null,
@@ -14,8 +16,8 @@ export function buildChangesSummary(
   const parts: string[] = []
 
   for (const field of TRACKED_FIELDS) {
-    const bv = before.pkg[field as keyof Package]
-    const av = after.pkg[field as keyof Package]
+    const bv = before.pkg[field]
+    const av = after.pkg[field]
     if (bv !== av) {
       parts.push(`${field} ${bv ?? 'null'}→${av ?? 'null'}`)
     }
