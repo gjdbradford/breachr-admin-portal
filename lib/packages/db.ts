@@ -11,7 +11,7 @@ export async function listPackages(): Promise<PackageListItem[]> {
   const db = createServiceClient()
 
   const [
-    { data: packages },
+    { data: packages, error: pkgsErr },
     { data: allModules },
     { data: tenantRows },
     { data: pushRows },
@@ -24,6 +24,8 @@ export async function listPackages(): Promise<PackageListItem[]> {
       .eq('status', 'success')
       .order('pushed_at', { ascending: false }),
   ])
+
+  if (pkgsErr) throw new Error(pkgsErr.message)
 
   const tenantCountMap = new Map<string, number>()
   for (const r of tenantRows ?? []) {
@@ -51,7 +53,7 @@ export async function getPackage(id: string): Promise<PackageDetail | null> {
   const db = createServiceClient()
 
   const [
-    { data: pkg },
+    { data: pkg, error: pkgErr },
     { data: modules },
     { data: ceilings },
     { data: pushLog },
@@ -64,6 +66,7 @@ export async function getPackage(id: string): Promise<PackageDetail | null> {
     db.from('tenant_packages').select('id').eq('package_id', id),
   ])
 
+  if (pkgErr) throw new Error(pkgErr.message)
   if (!pkg) return null
 
   return {
@@ -174,24 +177,40 @@ export async function pushPackageToEnv(
     throw new Error(`Push to ${env} failed: ${upsertErr.message}`)
   }
 
+  // modules
   await targetDb.from('package_modules').delete().eq('package_id', packageId)
   if (detail.modules.length > 0) {
-    await targetDb.from('package_modules').insert(
+    const { error: modErr } = await targetDb.from('package_modules').insert(
       detail.modules.map(m => ({
         package_id: m.package_id, module_slug: m.module_slug,
         access_mode: m.access_mode, trial_days: m.trial_days,
       }))
     )
+    if (modErr) {
+      await adminDb.from('package_push_log').insert({
+        package_id: packageId, environment: env, pushed_by: pushedBy,
+        changes_summary: summary, status: 'failed',
+      })
+      throw new Error(`Push to ${env} failed (modules): ${modErr.message}`)
+    }
   }
 
+  // ceilings
   await targetDb.from('package_role_ceilings').delete().eq('package_id', packageId)
   if (detail.ceilings.length > 0) {
-    await targetDb.from('package_role_ceilings').insert(
+    const { error: ceilErr } = await targetDb.from('package_role_ceilings').insert(
       detail.ceilings.map(c => ({
         package_id: c.package_id, role: c.role,
         permission: c.permission, enabled: c.enabled,
       }))
     )
+    if (ceilErr) {
+      await adminDb.from('package_push_log').insert({
+        package_id: packageId, environment: env, pushed_by: pushedBy,
+        changes_summary: summary, status: 'failed',
+      })
+      throw new Error(`Push to ${env} failed (ceilings): ${ceilErr.message}`)
+    }
   }
 
   await adminDb.from('package_push_log').insert({
@@ -215,7 +234,17 @@ export async function setPackageStatus(id: string, status: 'active' | 'archived'
   if (error) throw new Error(error.message)
 }
 
-export async function getPackageTenants(packageId: string) {
+type TenantPackageRow = {
+  id: string
+  assigned_at: string
+  assigned_by: string | null
+  override_reason: string | null
+  stripe_sub_id: string | null
+  tenant: { id: string; name: string; subdomain: string } | null
+  trials: Array<{ module_slug: string; expires_at: string; first_accessed_at: string }>
+}
+
+export async function getPackageTenants(packageId: string): Promise<TenantPackageRow[]> {
   const db = createServiceClient()
   const { data } = await db
     .from('tenant_packages')
@@ -235,7 +264,8 @@ export async function getPackageTenants(packageId: string) {
 
 export async function reassignTenant(tenantId: string, newPackageId: string, assignedBy: string): Promise<void> {
   const db = createServiceClient()
-  await db.from('tenant_packages').delete().eq('tenant_id', tenantId)
+  const { error: deleteErr } = await db.from('tenant_packages').delete().eq('tenant_id', tenantId)
+  if (deleteErr) throw new Error(deleteErr.message)
   const { error } = await db.from('tenant_packages').insert({
     tenant_id: tenantId,
     package_id: newPackageId,

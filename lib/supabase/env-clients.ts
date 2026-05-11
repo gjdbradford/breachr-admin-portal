@@ -4,13 +4,15 @@ import type { EnvName } from '@/lib/packages/types'
 
 export function createEnvServiceClient(env: EnvName) {
   if (env === 'staging') {
-    return createClient(
-      process.env.SUPABASE_STAGING_URL!,
-      process.env.SUPABASE_STAGING_SERVICE_KEY!,
-    )
+    const url = process.env.SUPABASE_STAGING_URL
+    const key = process.env.SUPABASE_STAGING_SERVICE_KEY
+    if (!url) throw new Error('Missing env: SUPABASE_STAGING_URL')
+    if (!key) throw new Error('Missing env: SUPABASE_STAGING_SERVICE_KEY')
+    return createClient(url, key)
   }
-  return createClient(
-    process.env.SUPABASE_PROD_URL!,
-    process.env.SUPABASE_PROD_SERVICE_KEY!,
-  )
+  const url = process.env.SUPABASE_PROD_URL
+  const key = process.env.SUPABASE_PROD_SERVICE_KEY
+  if (!url) throw new Error('Missing env: SUPABASE_PROD_URL')
+  if (!key) throw new Error('Missing env: SUPABASE_PROD_SERVICE_KEY')
+  return createClient(url, key)
 }
