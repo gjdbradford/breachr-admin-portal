@@ -1,6 +1,7 @@
 // admin/app/dashboard/packages/[packageId]/tabs/RoleCeilingsTab.tsx
 'use client'
 
+import React from 'react'
 import type { ModuleSlug, AccessMode } from '@/lib/packages/types'
 import type { Permission } from '@/lib/permissions'
 
@@ -90,8 +91,8 @@ export default function RoleCeilingsTab({ permissionGroups, moduleModes, ceiling
             const mode: AccessMode = modSlug ? (moduleModes[modSlug]?.mode ?? 'off') : 'full'
             const isOff = mode === 'off'
             return (
-              <>
-                <tr key={group.label}>
+              <React.Fragment key={group.label}>
+                <tr>
                   <td colSpan={3} style={{ background: 'rgba(255,255,255,.025)', color: '#64748b', fontSize: 10, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', padding: '6px 12px' }}>
                     {group.label}
                     <span style={{ float: 'right', fontSize: 9, padding: '1px 6px', borderRadius: 3, background: 'rgba(255,255,255,.05)', color: MODE_COLOR[mode] }}>
@@ -117,7 +118,7 @@ export default function RoleCeilingsTab({ permissionGroups, moduleModes, ceiling
                     </tr>
                   )
                 })}
-              </>
+              </React.Fragment>
             )
           })}
         </tbody>
