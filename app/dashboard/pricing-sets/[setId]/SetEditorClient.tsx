@@ -14,6 +14,31 @@ type Props = {
   isNew: boolean
 }
 
+type DeployStatus = 'prod' | 'stale' | 'staging' | 'undeployed'
+
+function deployStatus(pkg: PackageListItem): DeployStatus {
+  if (pkg.last_push_production) {
+    return new Date(pkg.last_push_production) >= new Date(pkg.updated_at) ? 'prod' : 'stale'
+  }
+  return pkg.last_push_staging ? 'staging' : 'undeployed'
+}
+
+const DEPLOY_BADGE: Record<DeployStatus, { label: string; color: string; bg: string; border: string }> = {
+  prod:       { label: 'Prod',        color: '#22c55e', bg: 'rgba(34,197,94,.1)',   border: 'rgba(34,197,94,.25)' },
+  stale:      { label: 'Stale',       color: '#f59e0b', bg: 'rgba(245,158,11,.1)',  border: 'rgba(245,158,11,.25)' },
+  staging:    { label: 'Staging only',color: '#42a5f5', bg: 'rgba(66,165,245,.08)', border: 'rgba(66,165,245,.2)' },
+  undeployed: { label: 'Not deployed',color: '#ef4444', bg: 'rgba(239,68,68,.08)',  border: 'rgba(239,68,68,.2)' },
+}
+
+function DeployBadge({ pkg }: { pkg: PackageListItem }) {
+  const d = DEPLOY_BADGE[deployStatus(pkg)]
+  return (
+    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: d.bg, border: `1px solid ${d.border}`, color: d.color, letterSpacing: '.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+      {d.label}
+    </span>
+  )
+}
+
 export default function SetEditorClient({ set, allPackages, isNew }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -172,6 +197,7 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{pkg.name}</div>
                     <div style={{ fontSize: 10, color: '#475569' }}>€{pkg.price_monthly}/mo · {pkg.slug}</div>
                   </div>
+                  <DeployBadge pkg={pkg} />
                 </div>
               )
             })}
@@ -192,6 +218,7 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
                     style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', cursor: 'grab' }}>
                     <span style={{ color: '#334155', fontSize: 13, userSelect: 'none' }}>⠿</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0', flex: 1 }}>{idx + 1}. {pkg.name}</span>
+                    <DeployBadge pkg={pkg} />
                     <span style={{ fontSize: 10, color: '#475569' }}>€{pkg.price_monthly}/mo</span>
                   </div>
                 ))}
