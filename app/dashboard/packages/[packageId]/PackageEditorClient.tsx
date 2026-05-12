@@ -1,7 +1,7 @@
 // admin/app/dashboard/packages/[packageId]/PackageEditorClient.tsx
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
@@ -32,6 +32,12 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   const [activeTab, setActiveTab] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // Dirty / unsaved changes tracking
+  const [isDirty, setIsDirty] = useState(false)
+  const [pendingNav, setPendingNav] = useState<string | null>(null)
+  const [isNavSaving, setIsNavSaving] = useState(false)
+  const markDirty = () => setIsDirty(true)
+
   // Basics state
   const [name,            setName]            = useState(pkg?.name ?? '')
   const [slug,            setSlug]            = useState(pkg?.slug ?? '')
@@ -55,9 +61,11 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
 
   function setModuleMode(s: ModuleSlug, mode: AccessMode) {
     setModuleModes(prev => ({ ...prev, [s]: { ...prev[s], mode } }))
+    markDirty()
   }
   function setModuleTrialDays(s: ModuleSlug, days: number | null) {
     setModuleModes(prev => ({ ...prev, [s]: { ...prev[s], trialDays: days } }))
+    markDirty()
   }
 
   // Role ceilings state
@@ -71,7 +79,42 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
 
   function setCeiling(role: 'admin' | 'member', permission: string, enabled: boolean) {
     setCeilingsState(prev => ({ ...prev, [`${role}:${permission}`]: enabled }))
+    markDirty()
   }
+
+  // ── Unsaved changes guards ─────────────────────────────────────────────
+
+  // Browser close / hard refresh
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // In-app navigation — intercept all internal anchor clicks
+  const isDirtyRef = useRef(isDirty)
+  useEffect(() => { isDirtyRef.current = isDirty }, [isDirty])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!isDirtyRef.current) return
+      const anchor = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null
+      if (!anchor) return
+      const href = anchor.getAttribute('href') ?? ''
+      if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto')) return
+      e.preventDefault()
+      e.stopPropagation()
+      setPendingNav(href)
+    }
+    document.addEventListener('click', handler, { capture: true })
+    return () => document.removeEventListener('click', handler, { capture: true })
+  }, [])
+
+  // ── Payload / save helpers ──────────────────────────────────────────────
 
   function buildPayload(): SavePackagePayload {
     return {
@@ -113,6 +156,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       if (result.error) {
         toast.error(result.error)
       } else {
+        setIsDirty(false)
         toast.success('Package saved')
         if (isNew) router.push(`/dashboard/packages/${result.id}`)
       }
@@ -125,8 +169,41 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       : null
     const result = await saveAndDeployAction(buildPayload(), env, baseline)
     setSaveError(result.error ?? null)
+    if (!result.error) setIsDirty(false)
     return result
   }
+
+  // ── Nav-guard modal actions ─────────────────────────────────────────────
+
+  function handleStay() {
+    setPendingNav(null)
+  }
+
+  async function handleSaveAndNavigate() {
+    if (!pendingNav) return
+    setIsNavSaving(true)
+    const result = await savePackage()
+    setIsNavSaving(false)
+    if (result.error) {
+      toast.error(result.error)
+      setPendingNav(null)
+    } else {
+      setIsDirty(false)
+      const nav = pendingNav
+      setPendingNav(null)
+      toast.success('Package saved')
+      router.push(nav)
+    }
+  }
+
+  function handleLeaveWithoutSaving() {
+    setIsDirty(false)
+    const nav = pendingNav!
+    setPendingNav(null)
+    router.push(nav)
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────
 
   const STATUS_BADGE: Record<PackageStatus, string> = {
     active: 'badge-green', draft: 'badge-grey', archived: 'badge-red',
@@ -138,6 +215,42 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
 
   return (
     <div>
+      {/* Unsaved-changes confirmation modal */}
+      {pendingNav && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, padding: '28px 32px', width: 380, boxShadow: '0 24px 60px rgba(0,0,0,.5)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', marginBottom: 8 }}>Unsaved changes</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24, lineHeight: 1.5 }}>
+              You have unsaved changes to this package. What would you like to do?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={handleSaveAndNavigate}
+                disabled={isNavSaving}
+                className="btn-p"
+                style={{ width: '100%', padding: '10px 0', fontSize: 13 }}
+              >
+                {isNavSaving ? 'Saving…' : 'Save and continue'}
+              </button>
+              <button
+                onClick={handleLeaveWithoutSaving}
+                className="btn-s"
+                style={{ width: '100%', padding: '10px 0', fontSize: 13, color: '#ef4444', borderColor: 'rgba(239,68,68,.3)' }}
+              >
+                Leave without saving
+              </button>
+              <button
+                onClick={handleStay}
+                className="btn-s"
+                style={{ width: '100%', padding: '10px 0', fontSize: 13 }}
+              >
+                Stay on this page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Topbar */}
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -148,7 +261,13 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {saveError && <span style={{ fontSize: 11, color: '#ef4444' }}>{saveError}</span>}
-          <button className="btn-s" onClick={() => router.push('/dashboard/packages')}>Discard</button>
+          {isDirty && <span style={{ fontSize: 11, color: '#f59e0b' }}>Unsaved changes</span>}
+          <button
+            className="btn-s"
+            onClick={() => isDirty ? setPendingNav('/dashboard/packages') : router.push('/dashboard/packages')}
+          >
+            Discard
+          </button>
           <button className="btn-p" onClick={handleSave} disabled={isPending}>
             {isPending ? 'Saving…' : 'Save'}
           </button>
@@ -171,17 +290,17 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       {/* Tab content */}
       <div style={{ display: activeTab === 0 ? 'block' : 'none' }}>
         <BasicsTab
-          name={name} setName={setName}
-          slug={slug} setSlug={setSlug}
-          description={description} setDescription={setDescription}
-          priceMonthly={priceMonthly} setPriceMonthly={setPriceMonthly}
-          priceAnnual={priceAnnual} setPriceAnnual={setPriceAnnual}
-          scansLimit={scansLimit} setScansLimit={setScansLimit}
-          tokensLimit={tokensLimit} setTokensLimit={setTokensLimit}
-          targetsLimit={targetsLimit} setTargetsLimit={setTargetsLimit}
-          scanTypes={scanTypes} setScanTypes={setScanTypes}
-          stripeProductId={stripeProductId} setStripeProductId={setStripeProductId}
-          status={status} setStatus={setStatus}
+          name={name} setName={v => { setName(v); markDirty() }}
+          slug={slug} setSlug={v => { setSlug(v); markDirty() }}
+          description={description} setDescription={v => { setDescription(v); markDirty() }}
+          priceMonthly={priceMonthly} setPriceMonthly={v => { setPriceMonthly(v); markDirty() }}
+          priceAnnual={priceAnnual} setPriceAnnual={v => { setPriceAnnual(v); markDirty() }}
+          scansLimit={scansLimit} setScansLimit={v => { setScansLimit(v); markDirty() }}
+          tokensLimit={tokensLimit} setTokensLimit={v => { setTokensLimit(v); markDirty() }}
+          targetsLimit={targetsLimit} setTargetsLimit={v => { setTargetsLimit(v); markDirty() }}
+          scanTypes={scanTypes} setScanTypes={v => { setScanTypes(v); markDirty() }}
+          stripeProductId={stripeProductId} setStripeProductId={v => { setStripeProductId(v); markDirty() }}
+          status={status} setStatus={v => { setStatus(v); markDirty() }}
         />
       </div>
       <div style={{ display: activeTab === 1 ? 'block' : 'none' }}>
