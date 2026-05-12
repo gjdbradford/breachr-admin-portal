@@ -134,7 +134,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
           {saveSuccess && <span style={{ fontSize: 11, color: '#22c55e' }}>Saved</span>}
           <button className="btn-s" onClick={() => router.push('/dashboard/packages')}>Discard</button>
           <button className="btn-p" onClick={handleSave} disabled={isPending}>
-            {isPending ? 'Saving…' : 'Save draft'}
+            {isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

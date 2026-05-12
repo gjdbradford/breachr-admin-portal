@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { toast } from 'sonner'
 import type { ModuleSlug, AccessMode, PackagePushLog, EnvName } from '@/lib/packages/types'
 import { pushToEnvAction, redactLogEntryAction } from '../actions'
 
@@ -51,8 +52,14 @@ export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode,
     setPushingEnv(env)
     startPush(async () => {
       const result = await pushToEnvAction(packageId, env)
-      if (result.error) { setPushingEnv(null); setPushError(result.error) }
-      else window.location.reload()
+      if (result.error) {
+        setPushingEnv(null)
+        setPushError(result.error)
+        toast.error(`Push to ${env} failed: ${result.error}`)
+      } else {
+        toast.success(`Successfully deployed to ${env === 'staging' ? 'Staging' : 'Production'}`)
+        setTimeout(() => window.location.reload(), 1200)
+      }
     })
   }
 
