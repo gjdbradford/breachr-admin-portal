@@ -16,7 +16,7 @@ export async function listPackages(): Promise<PackageListItem[]> {
     { data: tenantRows },
     { data: pushRows },
   ] = await Promise.all([
-    db.from('packages').select('*').order('created_at', { ascending: false }),
+    db.from('packages').select('*').order('display_order', { ascending: true }).order('created_at', { ascending: true }),
     db.from('package_modules').select('*'),
     db.from('tenant_packages').select('package_id'),
     db.from('package_push_log')
@@ -86,14 +86,18 @@ export async function savePackageFull(payload: SavePackagePayload): Promise<stri
     name: payload.name,
     slug: payload.slug,
     description: payload.description,
-    price_monthly: payload.price_monthly,
-    price_annual: payload.price_annual,
+    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_annual: payload.is_poa ? null : payload.price_annual,
+    is_poa: payload.is_poa,
     scans_limit: payload.scans_limit,
     tokens_limit: payload.tokens_limit,
     targets_limit: payload.targets_limit,
     scan_types: payload.scan_types,
-    stripe_product_id: payload.stripe_product_id,
+    stripe_product_id: payload.is_poa ? null : payload.stripe_product_id,
     status: payload.status,
+    features: payload.features,
+    badge: payload.badge,
+    cta_label: payload.cta_label,
   }
 
   const { data: saved, error: pkgErr } = await db
@@ -152,6 +156,15 @@ export async function pushPackageToEnv(
 
   const summary = buildChangesSummary(before, after)
 
+  const deployedConfig = {
+    name: detail.name, slug: detail.slug, description: detail.description,
+    price_monthly: detail.is_poa ? null : detail.price_monthly,
+    price_annual: detail.is_poa ? null : detail.price_annual,
+    is_poa: detail.is_poa ?? false,
+    features: detail.features, badge: detail.badge, cta_label: detail.cta_label,
+    display_order: detail.display_order,
+  }
+
   const { error: upsertErr } = await targetDb
     .from('packages')
     .upsert({
@@ -159,14 +172,19 @@ export async function pushPackageToEnv(
       name: detail.name,
       slug: detail.slug,
       description: detail.description,
-      price_monthly: detail.price_monthly,
-      price_annual: detail.price_annual,
+      price_monthly: detail.is_poa ? null : detail.price_monthly,
+      price_annual: detail.is_poa ? null : detail.price_annual,
+      is_poa: detail.is_poa ?? false,
       scans_limit: detail.scans_limit,
       tokens_limit: detail.tokens_limit,
       targets_limit: detail.targets_limit,
       scan_types: detail.scan_types,
-      stripe_product_id: detail.stripe_product_id,
+      stripe_product_id: detail.is_poa ? null : detail.stripe_product_id,
       status: detail.status,
+      features: detail.features,
+      badge: detail.badge,
+      cta_label: detail.cta_label,
+      deployed_config: deployedConfig,
     }, { onConflict: 'id' })
 
   if (upsertErr) {
@@ -257,13 +275,26 @@ export async function saveAndPushToEnv(
 
   await savePackageFull(payload)
 
+  const deployedConfig = {
+    name: payload.name, slug: payload.slug, description: payload.description,
+    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_annual: payload.is_poa ? null : payload.price_annual,
+    is_poa: payload.is_poa,
+    features: payload.features, badge: payload.badge, cta_label: payload.cta_label,
+  }
+
   const { error: upsertErr } = await targetDb.from('packages').upsert({
     id: packageId,
     name: payload.name, slug: payload.slug, description: payload.description,
-    price_monthly: payload.price_monthly, price_annual: payload.price_annual,
+    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_annual: payload.is_poa ? null : payload.price_annual,
+    is_poa: payload.is_poa,
     scans_limit: payload.scans_limit, tokens_limit: payload.tokens_limit,
     targets_limit: payload.targets_limit, scan_types: payload.scan_types,
-    stripe_product_id: payload.stripe_product_id, status: payload.status,
+    stripe_product_id: payload.is_poa ? null : payload.stripe_product_id,
+    status: payload.status,
+    features: payload.features, badge: payload.badge, cta_label: payload.cta_label,
+    deployed_config: deployedConfig,
   }, { onConflict: 'id' })
 
   if (upsertErr) {
@@ -364,4 +395,13 @@ export async function reassignTenant(tenantId: string, newPackageId: string, ass
     override_reason: 'Manual reassignment via admin portal',
   })
   if (error) throw new Error(error.message)
+}
+
+export async function reorderPackages(orderedIds: string[]): Promise<void> {
+  const db = createServiceClient()
+  await Promise.all(
+    orderedIds.map((id, idx) =>
+      db.from('packages').update({ display_order: idx }).eq('id', id)
+    )
+  )
 }

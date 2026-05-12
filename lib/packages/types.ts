@@ -1,4 +1,13 @@
 export type PackageStatus = 'draft' | 'active' | 'archived'
+export type PackageBadge = 'best_value' | 'most_popular'
+export type FeatureItemKind = 'item' | 'section' | 'highlight'
+
+export interface PackageFeatureItem {
+  id: string
+  text: string
+  kind: FeatureItemKind
+  icon?: string
+}
 export type ModuleSlug = 'scans' | 'findings' | 'assets' | 'reports' | 'exports' | 'remediation' | 'audit' | 'team'
 export type AccessMode = 'full' | 'trial' | 'paywalled' | 'off'
 export type EnvName = 'staging' | 'production'
@@ -14,12 +23,17 @@ export interface Package {
   description: string | null
   price_monthly: number
   price_annual: number | null
+  is_poa: boolean
   scans_limit: number | null
   tokens_limit: number | null
   targets_limit: number | null
   scan_types: string[]
   stripe_product_id: string | null
   status: PackageStatus
+  features: PackageFeatureItem[]
+  badge: PackageBadge | null
+  cta_label: string | null
+  display_order: number
   created_at: string
   updated_at: string
 }
@@ -73,12 +87,16 @@ export interface SavePackagePayload {
   description: string | null
   price_monthly: number
   price_annual: number | null
+  is_poa: boolean
   scans_limit: number | null
   tokens_limit: number | null
   targets_limit: number | null
   scan_types: string[]
   stripe_product_id: string | null
   status: PackageStatus
+  features: PackageFeatureItem[]
+  badge: PackageBadge | null
+  cta_label: string | null
   modules: Array<{ module_slug: ModuleSlug; access_mode: AccessMode; trial_days: number | null }>
   ceilings: Array<{ role: 'admin' | 'member'; permission: string; enabled: boolean }>
 }

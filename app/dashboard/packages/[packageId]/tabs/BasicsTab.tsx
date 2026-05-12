@@ -10,6 +10,7 @@ type Props = {
   name: string;            setName: (v: string) => void
   slug: string;            setSlug: (v: string) => void
   description: string;     setDescription: (v: string) => void
+  isPoa: boolean;          setIsPoa: (v: boolean) => void
   priceMonthly: number;    setPriceMonthly: (v: number) => void
   priceAnnual: number | null; setPriceAnnual: (v: number | null) => void
   scansLimit: number | null;  setScansLimit: (v: number | null) => void
@@ -100,13 +101,26 @@ export default function BasicsTab(props: Props) {
         <Field label="Description">
           <input value={props.description} onChange={e => props.setDescription(e.target.value)} placeholder="e.g. Best for growing security teams" />
         </Field>
-        <Field label="Stripe Product ID">
-          <input value={props.stripeProductId} onChange={e => props.setStripeProductId(e.target.value)} placeholder="prod_…" style={{ color: '#a78bfa' }} />
+        <Field label="Stripe Product ID" hint={props.isPoa ? 'Not applicable for POA plans' : undefined}>
+          <input value={props.isPoa ? '' : props.stripeProductId} onChange={e => props.setStripeProductId(e.target.value)} placeholder={props.isPoa ? 'N/A — POA plan' : 'prod_…'} disabled={props.isPoa} style={{ color: props.isPoa ? '#334155' : '#a78bfa', opacity: props.isPoa ? 0.4 : 1 }} />
         </Field>
       </div>
 
       <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 14 }}>Pricing</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={props.isPoa}
+            onChange={e => props.setIsPoa(e.target.checked)}
+            style={{ width: 14, height: 14, accentColor: '#a78bfa', cursor: 'pointer', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: 12, fontWeight: 600, color: props.isPoa ? '#a78bfa' : '#64748b' }}>
+            Price on Application (POA) — no Stripe checkout, CTA routes to sales
+          </span>
+        </label>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24, opacity: props.isPoa ? 0.35 : 1, pointerEvents: props.isPoa ? 'none' : 'auto' }}>
         <Field label="Price / Month (€)">
           <NumInput value={props.priceMonthly} onChange={v => props.setPriceMonthly(v ?? 0)} />
         </Field>

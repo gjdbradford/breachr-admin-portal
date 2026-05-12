@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import type {
   PackageDetail, PackageListItem, SavePackagePayload,
   ModuleSlug, AccessMode, PackageStatus, EnvName,
+  PackageFeatureItem, PackageBadge,
 } from '@/lib/packages/types'
 import type { Permission } from '@/lib/permissions'
 import { savePackageAction, saveAndDeployAction } from './actions'
@@ -16,6 +17,7 @@ import RoleCeilingsTab from './tabs/RoleCeilingsTab'
 import TenantsTab     from './tabs/TenantsTab'
 import AnalyticsTab   from './tabs/AnalyticsTab'
 import DeploymentTab  from './tabs/DeploymentTab'
+import FeaturesTab    from './tabs/FeaturesTab'
 
 type Props = {
   pkg: PackageDetail | null
@@ -42,6 +44,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   const [name,            setName]            = useState(pkg?.name ?? '')
   const [slug,            setSlug]            = useState(pkg?.slug ?? '')
   const [description,     setDescription]     = useState(pkg?.description ?? '')
+  const [isPoa,           setIsPoa]           = useState(pkg?.is_poa ?? false)
   const [priceMonthly,    setPriceMonthly]    = useState(pkg?.price_monthly ?? 0)
   const [priceAnnual,     setPriceAnnual]     = useState<number | null>(pkg?.price_annual ?? null)
   const [scansLimit,      setScansLimit]      = useState<number | null>(pkg?.scans_limit ?? null)
@@ -50,6 +53,9 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   const [scanTypes,       setScanTypes]       = useState<string[]>(pkg?.scan_types ?? [])
   const [stripeProductId, setStripeProductId] = useState(pkg?.stripe_product_id ?? '')
   const [status,          setStatus]          = useState<PackageStatus>(pkg?.status ?? 'draft')
+  const [features,        setFeatures]        = useState<PackageFeatureItem[]>(pkg?.features ?? [])
+  const [badge,           setBadge]           = useState<PackageBadge | null>(pkg?.badge ?? null)
+  const [ctaLabel,        setCtaLabel]        = useState(pkg?.cta_label ?? '')
 
   // Modules state
   const defaultModes: Record<ModuleSlug, { mode: AccessMode; trialDays: number | null }> = {} as any
@@ -121,14 +127,18 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       id: pkg?.id ?? null,
       name, slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       description: description || null,
-      price_monthly: priceMonthly,
-      price_annual: priceAnnual,
+      is_poa: isPoa,
+      price_monthly: isPoa ? 0 : priceMonthly,
+      price_annual: isPoa ? null : priceAnnual,
       scans_limit: scansLimit,
       tokens_limit: tokensLimit,
       targets_limit: targetsLimit,
       scan_types: scanTypes,
-      stripe_product_id: stripeProductId || null,
+      stripe_product_id: isPoa ? null : (stripeProductId || null),
       status,
+      features,
+      badge,
+      cta_label: ctaLabel || null,
       modules: moduleSlugList.map(s => ({
         module_slug: s,
         access_mode: moduleModes[s].mode,
@@ -211,7 +221,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
 
   const deploymentReady = Boolean(pkg?.id) && Boolean(name) && Boolean(slug)
 
-  const TABS = ['Basics', 'Modules', 'Role Ceilings', `Tenants (${pkg?.tenant_count ?? 0})`, 'Analytics', ...(deploymentReady ? ['Deployment'] : [])]
+  const TABS = ['Basics', 'Modules', 'Features', 'Role Ceilings', `Tenants (${pkg?.tenant_count ?? 0})`, 'Analytics', ...(deploymentReady ? ['Deployment'] : [])]
 
   return (
     <div>
@@ -293,6 +303,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
           name={name} setName={v => { setName(v); markDirty() }}
           slug={slug} setSlug={v => { setSlug(v); markDirty() }}
           description={description} setDescription={v => { setDescription(v); markDirty() }}
+          isPoa={isPoa} setIsPoa={v => { setIsPoa(v); markDirty() }}
           priceMonthly={priceMonthly} setPriceMonthly={v => { setPriceMonthly(v); markDirty() }}
           priceAnnual={priceAnnual} setPriceAnnual={v => { setPriceAnnual(v); markDirty() }}
           scansLimit={scansLimit} setScansLimit={v => { setScansLimit(v); markDirty() }}
@@ -312,6 +323,16 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
         />
       </div>
       <div style={{ display: activeTab === 2 ? 'block' : 'none' }}>
+        <FeaturesTab
+          features={features}
+          setFeatures={v => { setFeatures(v); markDirty() }}
+          badge={badge}
+          setBadge={v => { setBadge(v); markDirty() }}
+          ctaLabel={ctaLabel}
+          setCtaLabel={v => { setCtaLabel(v); markDirty() }}
+        />
+      </div>
+      <div style={{ display: activeTab === 3 ? 'block' : 'none' }}>
         <RoleCeilingsTab
           permissionGroups={permissionGroups}
           moduleModes={moduleModes}
@@ -319,17 +340,17 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
           setCeiling={setCeiling}
         />
       </div>
-      <div style={{ display: activeTab === 3 ? 'block' : 'none' }}>
+      <div style={{ display: activeTab === 4 ? 'block' : 'none' }}>
         <TenantsTab
           packageId={pkg?.id ?? null}
           allPackages={allPackages}
         />
       </div>
-      <div style={{ display: activeTab === 4 ? 'block' : 'none' }}>
+      <div style={{ display: activeTab === 5 ? 'block' : 'none' }}>
         <AnalyticsTab packageId={pkg?.id ?? null} />
       </div>
       {deploymentReady && (
-        <div style={{ display: activeTab === 5 ? 'block' : 'none' }}>
+        <div style={{ display: activeTab === 6 ? 'block' : 'none' }}>
           <DeploymentTab
             packageId={pkg!.id}
             pushLog={pkg?.push_log ?? []}
