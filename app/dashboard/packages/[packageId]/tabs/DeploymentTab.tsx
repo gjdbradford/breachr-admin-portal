@@ -11,6 +11,7 @@ type Props = {
   packageId: string
   pushLog: PackagePushLog[]
   updatedAt: string
+  onSaveAndDeploy: (env: EnvName) => Promise<{ error?: string }>
 }
 
 function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): 'synced' | 'stale' | 'never' {
@@ -19,7 +20,7 @@ function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): '
   return new Date(lastSuccess.pushed_at) >= new Date(updatedAt) ? 'synced' : 'stale'
 }
 
-export default function DeploymentTab({ packageId, pushLog, updatedAt }: Props) {
+export default function DeploymentTab({ packageId, pushLog, updatedAt, onSaveAndDeploy }: Props) {
   const router = useRouter()
   const [isPushing, startPush] = useTransition()
   const [pushingEnv, setPushingEnv] = useState<EnvName | null>(null)
@@ -32,13 +33,20 @@ export default function DeploymentTab({ packageId, pushLog, updatedAt }: Props) 
     setPushError(null)
     setPushingEnv(env)
     startPush(async () => {
-      const result = await pushToEnvAction(packageId, env)
-      if (result.error) {
+      const saveResult = await onSaveAndDeploy(env)
+      if (saveResult.error) {
         setPushingEnv(null)
-        setPushError(result.error)
-        toast.error(`Push to ${env} failed: ${result.error}`)
+        setPushError(saveResult.error)
+        toast.error(`Deploy failed: ${saveResult.error}`)
+        return
+      }
+      const pushResult = await pushToEnvAction(packageId, env)
+      if (pushResult.error) {
+        setPushingEnv(null)
+        setPushError(pushResult.error)
+        toast.error(`Push to ${env} failed: ${pushResult.error}`)
       } else {
-        toast.success(`Successfully deployed to ${env === 'staging' ? 'Staging' : 'Production'}`)
+        toast.success(`Saved & deployed to ${env === 'staging' ? 'Staging' : 'Production'}`)
         setTimeout(() => router.refresh(), 800)
       }
     })

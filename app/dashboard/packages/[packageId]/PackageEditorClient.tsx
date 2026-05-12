@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type {
   PackageDetail, PackageListItem, SavePackagePayload,
-  ModuleSlug, AccessMode, PackageStatus,
+  ModuleSlug, AccessMode, PackageStatus, EnvName,
 } from '@/lib/packages/types'
 import type { Permission } from '@/lib/permissions'
 import { savePackageAction } from './actions'
@@ -100,18 +100,27 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
     }
   }
 
+  async function savePackage() {
+    const result = await savePackageAction(buildPayload())
+    setSaveError(result.error ?? null)
+    return result
+  }
+
   function handleSave() {
     setSaveError(null)
     startTransition(async () => {
-      const result = await savePackageAction(buildPayload())
+      const result = await savePackage()
       if (result.error) {
-        setSaveError(result.error)
         toast.error(result.error)
       } else {
         toast.success('Package saved')
         if (isNew) router.push(`/dashboard/packages/${result.id}`)
       }
     })
+  }
+
+  async function handleSaveAndDeploy(_env: EnvName): Promise<{ error?: string }> {
+    return savePackage()
   }
 
   const STATUS_BADGE: Record<PackageStatus, string> = {
@@ -203,6 +212,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
             packageId={pkg!.id}
             pushLog={pkg?.push_log ?? []}
             updatedAt={pkg?.updated_at ?? ''}
+            onSaveAndDeploy={handleSaveAndDeploy}
           />
         </div>
       )}
