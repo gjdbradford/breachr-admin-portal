@@ -1,7 +1,8 @@
 // admin/app/dashboard/packages/[packageId]/tabs/DeploymentTab.tsx
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { PackagePushLog, EnvName } from '@/lib/packages/types'
 import { pushToEnvAction, redactLogEntryAction } from '../actions'
@@ -19,10 +20,13 @@ function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): '
 }
 
 export default function DeploymentTab({ packageId, pushLog, updatedAt }: Props) {
+  const router = useRouter()
   const [isPushing, startPush] = useTransition()
   const [pushingEnv, setPushingEnv] = useState<EnvName | null>(null)
   const [pushError, setPushError] = useState<string | null>(null)
   const [localLog, setLocalLog] = useState<PackagePushLog[]>(pushLog)
+
+  useEffect(() => { setLocalLog(pushLog) }, [pushLog])
 
   function handlePush(env: EnvName) {
     setPushError(null)
@@ -35,7 +39,7 @@ export default function DeploymentTab({ packageId, pushLog, updatedAt }: Props) 
         toast.error(`Push to ${env} failed: ${result.error}`)
       } else {
         toast.success(`Successfully deployed to ${env === 'staging' ? 'Staging' : 'Production'}`)
-        setTimeout(() => window.location.reload(), 1200)
+        setTimeout(() => router.refresh(), 800)
       }
     })
   }

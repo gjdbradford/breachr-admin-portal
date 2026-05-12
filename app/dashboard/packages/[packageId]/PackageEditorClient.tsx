@@ -3,6 +3,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import type {
   PackageDetail, PackageListItem, SavePackagePayload,
   ModuleSlug, AccessMode, PackageStatus,
@@ -30,7 +31,6 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
 
   // Basics state
   const [name,            setName]            = useState(pkg?.name ?? '')
@@ -102,13 +102,13 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
 
   function handleSave() {
     setSaveError(null)
-    setSaveSuccess(false)
     startTransition(async () => {
       const result = await savePackageAction(buildPayload())
       if (result.error) {
         setSaveError(result.error)
+        toast.error(result.error)
       } else {
-        setSaveSuccess(true)
+        toast.success('Package saved')
         if (isNew) router.push(`/dashboard/packages/${result.id}`)
       }
     })
@@ -136,7 +136,6 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {saveError && <span style={{ fontSize: 11, color: '#ef4444' }}>{saveError}</span>}
-          {saveSuccess && <span style={{ fontSize: 11, color: '#22c55e' }}>Saved</span>}
           <button className="btn-s" onClick={() => router.push('/dashboard/packages')}>Discard</button>
           <button className="btn-p" onClick={handleSave} disabled={isPending}>
             {isPending ? 'Saving…' : 'Save'}
