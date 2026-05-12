@@ -40,7 +40,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   const [scansLimit,      setScansLimit]      = useState<number | null>(pkg?.scans_limit ?? null)
   const [tokensLimit,     setTokensLimit]     = useState<number | null>(pkg?.tokens_limit ?? null)
   const [targetsLimit,    setTargetsLimit]    = useState<number | null>(pkg?.targets_limit ?? null)
-  const [scanTypes,       setScanTypes]       = useState(pkg?.scan_types?.join(', ') ?? '')
+  const [scanTypes,       setScanTypes]       = useState<string[]>(pkg?.scan_types ?? [])
   const [stripeProductId, setStripeProductId] = useState(pkg?.stripe_product_id ?? '')
   const [status,          setStatus]          = useState<PackageStatus>(pkg?.status ?? 'draft')
 
@@ -73,7 +73,6 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   }
 
   function buildPayload(): SavePackagePayload {
-    const parsedScanTypes = scanTypes.split(',').map(s => s.trim()).filter(Boolean)
     return {
       id: pkg?.id ?? null,
       name, slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -83,7 +82,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       scans_limit: scansLimit,
       tokens_limit: tokensLimit,
       targets_limit: targetsLimit,
-      scan_types: parsedScanTypes,
+      scan_types: scanTypes,
       stripe_product_id: stripeProductId || null,
       status,
       modules: moduleSlugList.map(s => ({

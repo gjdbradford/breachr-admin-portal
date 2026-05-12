@@ -1,7 +1,10 @@
 // admin/app/dashboard/packages/[packageId]/tabs/BasicsTab.tsx
 'use client'
 
+import { useState, useEffect } from 'react'
 import type { PackageStatus } from '@/lib/packages/types'
+
+const SCAN_TYPE_OPTIONS = ['full', 'api', 'light', 'network', 'web']
 
 type Props = {
   name: string;            setName: (v: string) => void
@@ -12,7 +15,7 @@ type Props = {
   scansLimit: number | null;  setScansLimit: (v: number | null) => void
   tokensLimit: number | null; setTokensLimit: (v: number | null) => void
   targetsLimit: number | null; setTargetsLimit: (v: number | null) => void
-  scanTypes: string;       setScanTypes: (v: string) => void
+  scanTypes: string[];      setScanTypes: (v: string[]) => void
   stripeProductId: string; setStripeProductId: (v: string) => void
   status: PackageStatus;   setStatus: (v: PackageStatus) => void
 }
@@ -28,12 +31,51 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 function NumInput({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const [display, setDisplay] = useState(value == null ? '' : String(value))
+
+  useEffect(() => {
+    setDisplay(value == null ? '' : String(value))
+  }, [value])
+
   return (
     <input
-      type="number"
-      value={value ?? ''}
-      onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
+      type="text"
+      inputMode="numeric"
+      value={display}
+      onChange={e => {
+        const raw = e.target.value.replace(/[^0-9]/g, '')
+        setDisplay(raw)
+        onChange(raw === '' ? null : Number(raw))
+      }}
     />
+  )
+}
+
+function ScanTypeSelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const toggle = (type: string) => {
+    onChange(value.includes(type) ? value.filter(t => t !== type) : [...value, type])
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {SCAN_TYPE_OPTIONS.map(type => {
+        const active = value.includes(type)
+        return (
+          <button
+            key={type}
+            type="button"
+            onClick={() => toggle(type)}
+            style={{
+              padding: '4px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              border: `1px solid ${active ? '#3b82f6' : '#334155'}`,
+              background: active ? 'rgba(59,130,246,0.15)' : 'transparent',
+              color: active ? '#60a5fa' : '#64748b',
+            }}
+          >
+            {type}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -84,8 +126,8 @@ export default function BasicsTab(props: Props) {
         <Field label="Tokens / Month">
           <NumInput value={props.tokensLimit} onChange={props.setTokensLimit} />
         </Field>
-        <Field label="Scan Types" hint="comma-separated, e.g. full, api">
-          <input value={props.scanTypes} onChange={e => props.setScanTypes(e.target.value)} />
+        <Field label="Scan Types">
+          <ScanTypeSelect value={props.scanTypes} onChange={props.setScanTypes} />
         </Field>
       </div>
     </div>
