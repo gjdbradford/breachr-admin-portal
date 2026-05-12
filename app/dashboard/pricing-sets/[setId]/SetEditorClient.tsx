@@ -20,7 +20,10 @@ function toLocalDatetimeValue(iso: string): string {
 }
 
 function fromLocalDatetimeValue(v: string): string {
-  return new Date(v).toISOString()
+  const [date, time] = v.split('T')
+  const [year, month, day] = date.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  return new Date(year, month - 1, day, hours, minutes).toISOString()
 }
 
 export default function SetEditorClient({ set, allPackages, isNew }: Props) {
@@ -58,11 +61,14 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
   function onDragStart(idx: number) { dragIdx.current = idx }
   function onDragEnter(idx: number) {
     if (dragIdx.current === null || dragIdx.current === idx) return
-    const next = [...selectedIds]
-    const [moved] = next.splice(dragIdx.current, 1)
-    next.splice(idx, 0, moved)
+    const from = dragIdx.current
     dragIdx.current = idx
-    setSelectedIds(next)
+    setSelectedIds(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(idx, 0, moved)
+      return next
+    })
   }
   function onDragEnd() { dragIdx.current = null }
 
@@ -92,8 +98,8 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
   }
 
   const selectedPackages = selectedIds
-    .map(id => allPackages.find(p => p.id === id)!)
-    .filter(Boolean)
+    .map(id => allPackages.find(p => p.id === id))
+    .filter((p): p is PackageListItem => Boolean(p))
 
   const STATUS_BADGE: Record<PricingSetStatus, string> = {
     active: 'badge-green', draft: 'badge-grey', archived: 'badge-red',
