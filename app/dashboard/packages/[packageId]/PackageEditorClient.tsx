@@ -5,15 +5,16 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type {
   PackageDetail, PackageListItem, SavePackagePayload,
-  ModuleSlug, AccessMode, PackageStatus, EnvName,
+  ModuleSlug, AccessMode, PackageStatus,
 } from '@/lib/packages/types'
 import type { Permission } from '@/lib/permissions'
-import { savePackageAction, pushToEnvAction } from './actions'
-import BasicsTab     from './tabs/BasicsTab'
-import ModulesTab    from './tabs/ModulesTab'
+import { savePackageAction } from './actions'
+import BasicsTab      from './tabs/BasicsTab'
+import ModulesTab     from './tabs/ModulesTab'
 import RoleCeilingsTab from './tabs/RoleCeilingsTab'
-import TenantsTab    from './tabs/TenantsTab'
-import AnalyticsTab  from './tabs/AnalyticsTab'
+import TenantsTab     from './tabs/TenantsTab'
+import AnalyticsTab   from './tabs/AnalyticsTab'
+import DeploymentTab  from './tabs/DeploymentTab'
 
 type Props = {
   pkg: PackageDetail | null
@@ -117,7 +118,11 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
     active: 'badge-green', draft: 'badge-grey', archived: 'badge-red',
   }
 
-  const TABS = ['Basics', 'Modules', 'Role Ceilings', `Tenants (${pkg?.tenant_count ?? 0})`, 'Analytics']
+  const isSaved = Boolean(pkg?.id)
+  const hasModulesConfigured = moduleSlugList.some(s => moduleModes[s].mode !== 'off')
+  const deploymentReady = isSaved && Boolean(name) && Boolean(slug) && hasModulesConfigured
+
+  const TABS = ['Basics', 'Modules', 'Role Ceilings', `Tenants (${pkg?.tenant_count ?? 0})`, 'Analytics', ...(deploymentReady ? ['Deployment'] : [])]
 
   return (
     <div>
@@ -174,9 +179,6 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
           moduleModes={moduleModes}
           setModuleMode={setModuleMode}
           setModuleTrialDays={setModuleTrialDays}
-          packageId={pkg?.id ?? null}
-          pushLog={pkg?.push_log ?? []}
-          updatedAt={pkg?.updated_at ?? ''}
         />
       </div>
       <div style={{ display: activeTab === 2 ? 'block' : 'none' }}>
@@ -196,6 +198,15 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
       <div style={{ display: activeTab === 4 ? 'block' : 'none' }}>
         <AnalyticsTab packageId={pkg?.id ?? null} />
       </div>
+      {deploymentReady && (
+        <div style={{ display: activeTab === 5 ? 'block' : 'none' }}>
+          <DeploymentTab
+            packageId={pkg!.id}
+            pushLog={pkg?.push_log ?? []}
+            updatedAt={pkg?.updated_at ?? ''}
+          />
+        </div>
+      )}
     </div>
   )
 }
