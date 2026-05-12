@@ -9,7 +9,7 @@ import type {
   ModuleSlug, AccessMode, PackageStatus, EnvName,
 } from '@/lib/packages/types'
 import type { Permission } from '@/lib/permissions'
-import { savePackageAction } from './actions'
+import { savePackageAction, saveAndDeployAction } from './actions'
 import BasicsTab      from './tabs/BasicsTab'
 import ModulesTab     from './tabs/ModulesTab'
 import RoleCeilingsTab from './tabs/RoleCeilingsTab'
@@ -119,8 +119,10 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
     })
   }
 
-  async function handleSaveAndDeploy(_env: EnvName): Promise<{ error?: string }> {
-    return savePackage()
+  async function handleDeploy(env: EnvName): Promise<{ error?: string }> {
+    const result = await saveAndDeployAction(buildPayload(), env)
+    setSaveError(result.error ?? null)
+    return result
   }
 
   const STATUS_BADGE: Record<PackageStatus, string> = {
@@ -212,7 +214,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
             packageId={pkg!.id}
             pushLog={pkg?.push_log ?? []}
             updatedAt={pkg?.updated_at ?? ''}
-            onSaveAndDeploy={handleSaveAndDeploy}
+            onDeploy={handleDeploy}
           />
         </div>
       )}

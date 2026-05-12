@@ -5,13 +5,13 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { PackagePushLog, EnvName } from '@/lib/packages/types'
-import { pushToEnvAction, redactLogEntryAction } from '../actions'
+import { redactLogEntryAction } from '../actions'
 
 type Props = {
   packageId: string
   pushLog: PackagePushLog[]
   updatedAt: string
-  onSaveAndDeploy: (env: EnvName) => Promise<{ error?: string }>
+  onDeploy: (env: EnvName) => Promise<{ error?: string }>
 }
 
 function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): 'synced' | 'stale' | 'never' {
@@ -20,7 +20,7 @@ function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): '
   return new Date(lastSuccess.pushed_at) >= new Date(updatedAt) ? 'synced' : 'stale'
 }
 
-export default function DeploymentTab({ packageId, pushLog, updatedAt, onSaveAndDeploy }: Props) {
+export default function DeploymentTab({ packageId, pushLog, updatedAt, onDeploy }: Props) {
   const router = useRouter()
   const [isPushing, startPush] = useTransition()
   const [pushingEnv, setPushingEnv] = useState<EnvName | null>(null)
@@ -33,18 +33,11 @@ export default function DeploymentTab({ packageId, pushLog, updatedAt, onSaveAnd
     setPushError(null)
     setPushingEnv(env)
     startPush(async () => {
-      const saveResult = await onSaveAndDeploy(env)
-      if (saveResult.error) {
+      const result = await onDeploy(env)
+      if (result.error) {
         setPushingEnv(null)
-        setPushError(saveResult.error)
-        toast.error(`Deploy failed: ${saveResult.error}`)
-        return
-      }
-      const pushResult = await pushToEnvAction(packageId, env)
-      if (pushResult.error) {
-        setPushingEnv(null)
-        setPushError(pushResult.error)
-        toast.error(`Push to ${env} failed: ${pushResult.error}`)
+        setPushError(result.error)
+        toast.error(`Deploy to ${env} failed: ${result.error}`)
       } else {
         toast.success(`Saved & deployed to ${env === 'staging' ? 'Staging' : 'Production'}`)
         setTimeout(() => router.refresh(), 800)
@@ -95,7 +88,7 @@ export default function DeploymentTab({ packageId, pushLog, updatedAt, onSaveAnd
                   className={env === 'staging' ? 'btn-s' : 'btn-p'}
                   style={{ fontSize: 11, padding: '4px 12px' }}
                 >
-                  {isPushing && pushingEnv === env ? '…' : env === 'staging' ? '▲ Push to Staging' : '✓ Push to Production'}
+                  {isPushing && pushingEnv === env ? 'Deploying…' : env === 'staging' ? '▲ Push to Staging' : '✓ Push to Production'}
                 </button>
               </div>
             </div>

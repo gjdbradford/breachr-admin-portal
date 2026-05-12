@@ -219,6 +219,90 @@ export async function pushPackageToEnv(
   })
 }
 
+export async function saveAndPushToEnv(
+  payload: SavePackagePayload,
+  env: EnvName,
+  pushedBy: string,
+): Promise<string> {
+  if (!payload.id) throw new Error('Cannot deploy an unsaved package')
+
+  const adminDb  = createServiceClient()
+  const targetDb = createEnvServiceClient(env)
+  const packageId = payload.id
+
+  // Capture target env state BEFORE saving — so the diff reflects what changed
+  // even when admin DB and target DB are the same project (e.g. staging).
+  const [{ data: targetPkg }, { data: targetMods }] = await Promise.all([
+    targetDb.from('packages').select('*').eq('id', packageId).maybeSingle(),
+    targetDb.from('package_modules').select('*').eq('package_id', packageId),
+  ])
+
+  const before = targetPkg
+    ? { pkg: targetPkg as Package, modules: (targetMods ?? []) as PackageModule[] }
+    : null
+
+  const after = {
+    pkg: payload as unknown as Package,
+    modules: payload.modules as unknown as PackageModule[],
+  }
+
+  const summary = buildChangesSummary(before, after)
+
+  await savePackageFull(payload)
+
+  const { error: upsertErr } = await targetDb.from('packages').upsert({
+    id: packageId,
+    name: payload.name, slug: payload.slug, description: payload.description,
+    price_monthly: payload.price_monthly, price_annual: payload.price_annual,
+    scans_limit: payload.scans_limit, tokens_limit: payload.tokens_limit,
+    targets_limit: payload.targets_limit, scan_types: payload.scan_types,
+    stripe_product_id: payload.stripe_product_id, status: payload.status,
+  }, { onConflict: 'id' })
+
+  if (upsertErr) {
+    await adminDb.from('package_push_log').insert({
+      package_id: packageId, environment: env, pushed_by: pushedBy,
+      changes_summary: summary, status: 'failed',
+    })
+    throw new Error(`Deploy to ${env} failed: ${upsertErr.message}`)
+  }
+
+  await targetDb.from('package_modules').delete().eq('package_id', packageId)
+  if (payload.modules.length > 0) {
+    const { error: modErr } = await targetDb.from('package_modules').insert(
+      payload.modules.map(m => ({ ...m, package_id: packageId }))
+    )
+    if (modErr) {
+      await adminDb.from('package_push_log').insert({
+        package_id: packageId, environment: env, pushed_by: pushedBy,
+        changes_summary: summary, status: 'failed',
+      })
+      throw new Error(`Deploy to ${env} failed (modules): ${modErr.message}`)
+    }
+  }
+
+  await targetDb.from('package_role_ceilings').delete().eq('package_id', packageId)
+  if (payload.ceilings.length > 0) {
+    const { error: ceilErr } = await targetDb.from('package_role_ceilings').insert(
+      payload.ceilings.map(c => ({ ...c, package_id: packageId }))
+    )
+    if (ceilErr) {
+      await adminDb.from('package_push_log').insert({
+        package_id: packageId, environment: env, pushed_by: pushedBy,
+        changes_summary: summary, status: 'failed',
+      })
+      throw new Error(`Deploy to ${env} failed (ceilings): ${ceilErr.message}`)
+    }
+  }
+
+  await adminDb.from('package_push_log').insert({
+    package_id: packageId, environment: env, pushed_by: pushedBy,
+    changes_summary: summary, status: 'success',
+  })
+
+  return packageId
+}
+
 export async function redactPushLogEntry(logId: string, redactedBy: string): Promise<void> {
   const db = createServiceClient()
   const { error } = await db

@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
-  savePackageFull, pushPackageToEnv, redactPushLogEntry,
+  savePackageFull, saveAndPushToEnv, pushPackageToEnv, redactPushLogEntry,
   setPackageStatus, reassignTenant,
 } from '@/lib/packages/db'
 import type { SavePackagePayload, EnvName } from '@/lib/packages/types'
@@ -20,6 +20,19 @@ export async function savePackageAction(payload: SavePackagePayload): Promise<{ 
     return { id }
   } catch (e) {
     return { id: '', error: e instanceof Error ? e.message : 'Save failed' }
+  }
+}
+
+export async function saveAndDeployAction(
+  payload: SavePackagePayload,
+  env: EnvName,
+): Promise<{ id: string; error?: string }> {
+  try {
+    const pushedBy = await getAdminEmail()
+    const id = await saveAndPushToEnv(payload, env, pushedBy)
+    return { id }
+  } catch (e) {
+    return { id: '', error: e instanceof Error ? e.message : 'Deploy failed' }
   }
 }
 
