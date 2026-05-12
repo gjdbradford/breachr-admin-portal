@@ -69,6 +69,7 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
       next.splice(idx, 0, moved)
       return next
     })
+    markDirty()
   }
   function onDragEnd() { dragIdx.current = null }
 
