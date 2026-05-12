@@ -41,15 +41,17 @@ function envSyncState(log: PackagePushLog[], env: EnvName, updatedAt: string): '
 
 export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode, setModuleTrialDays, packageId, pushLog, updatedAt }: Props) {
   const [isPushing, startPush] = useTransition()
+  const [pushingEnv, setPushingEnv] = useState<EnvName | null>(null)
   const [pushError, setPushError] = useState<string | null>(null)
   const [localLog, setLocalLog] = useState<PackagePushLog[]>(pushLog)
 
   function handlePush(env: EnvName) {
     if (!packageId) { setPushError('Save the package first before pushing'); return }
     setPushError(null)
+    setPushingEnv(env)
     startPush(async () => {
       const result = await pushToEnvAction(packageId, env)
-      if (result.error) setPushError(result.error)
+      if (result.error) { setPushingEnv(null); setPushError(result.error) }
       else window.location.reload()
     })
   }
@@ -129,7 +131,7 @@ export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode,
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>{env === 'staging' ? 'Staging' : 'Production'}</div>
                 <div style={{ fontSize: 10, color: '#475569', marginTop: 1 }}>
-                  {state === 'never' ? 'Never pushed' : state === 'synced' ? `In sync · pushed ${new Date(lastLog!.pushed_at).toLocaleDateString()}` : `Stale · last pushed ${new Date(lastLog!.pushed_at).toLocaleDateString()}`}
+                  {state === 'never' ? 'Never pushed' : state === 'synced' ? `In sync · pushed ${new Date(lastLog!.pushed_at).toLocaleDateString('en-GB')}` : `Stale · last pushed ${new Date(lastLog!.pushed_at).toLocaleDateString('en-GB')}`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -144,7 +146,7 @@ export default function ModulesTab({ moduleSlugList, moduleModes, setModuleMode,
                   className={env === 'staging' ? 'btn-s' : 'btn-p'}
                   style={{ fontSize: 11, padding: '4px 12px' }}
                 >
-                  {isPushing ? '…' : env === 'staging' ? '▲ Push to Staging' : '✓ Push to Production'}
+                  {isPushing && pushingEnv === env ? '…' : env === 'staging' ? '▲ Push to Staging' : '✓ Push to Production'}
                 </button>
               </div>
             </div>
