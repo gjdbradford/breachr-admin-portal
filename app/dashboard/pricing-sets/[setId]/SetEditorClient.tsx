@@ -18,7 +18,11 @@ type DeployStatus = 'prod' | 'stale' | 'staging' | 'undeployed'
 
 function deployStatus(pkg: PackageListItem): DeployStatus {
   if (pkg.last_push_production) {
-    return new Date(pkg.last_push_production) >= new Date(pkg.updated_at) ? 'prod' : 'stale'
+    // Stale = staging has a newer deploy than production (actionable gap).
+    // Don't use updated_at — it bumps on every save, causing false positives.
+    const prodDate = new Date(pkg.last_push_production)
+    if (pkg.last_push_staging && new Date(pkg.last_push_staging) > prodDate) return 'stale'
+    return 'prod'
   }
   return pkg.last_push_staging ? 'staging' : 'undeployed'
 }
