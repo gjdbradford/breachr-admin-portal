@@ -6,7 +6,7 @@ import {
   savePackageFull, saveAndPushToEnv, pushPackageToEnv, redactPushLogEntry,
   setPackageStatus, reassignTenant,
 } from '@/lib/packages/db'
-import type { SavePackagePayload, EnvName } from '@/lib/packages/types'
+import type { SavePackagePayload, EnvName, Package, PackageModule } from '@/lib/packages/types'
 
 async function getAdminEmail(): Promise<string> {
   const supabase = await createClient()
@@ -26,10 +26,11 @@ export async function savePackageAction(payload: SavePackagePayload): Promise<{ 
 export async function saveAndDeployAction(
   payload: SavePackagePayload,
   env: EnvName,
+  baseline: { pkg: Package; modules: PackageModule[] } | null,
 ): Promise<{ id: string; error?: string }> {
   try {
     const pushedBy = await getAdminEmail()
-    const id = await saveAndPushToEnv(payload, env, pushedBy)
+    const id = await saveAndPushToEnv(payload, env, pushedBy, baseline)
     return { id }
   } catch (e) {
     return { id: '', error: e instanceof Error ? e.message : 'Deploy failed' }

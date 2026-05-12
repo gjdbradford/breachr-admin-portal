@@ -223,6 +223,7 @@ export async function saveAndPushToEnv(
   payload: SavePackagePayload,
   env: EnvName,
   pushedBy: string,
+  baseline: { pkg: Package; modules: PackageModule[] } | null,
 ): Promise<string> {
   if (!payload.id) throw new Error('Cannot deploy an unsaved package')
 
@@ -230,16 +231,22 @@ export async function saveAndPushToEnv(
   const targetDb = createEnvServiceClient(env)
   const packageId = payload.id
 
-  // Capture target env state BEFORE saving — so the diff reflects what changed
-  // even when admin DB and target DB are the same project (e.g. staging).
-  const [{ data: targetPkg }, { data: targetMods }] = await Promise.all([
-    targetDb.from('packages').select('*').eq('id', packageId).maybeSingle(),
-    targetDb.from('package_modules').select('*').eq('package_id', packageId),
-  ])
+  // For production we always diff against what's actually in prod right now.
+  // For staging (admin DB == staging DB) the baseline from page-load is the
+  // only reliable source of truth — by the time Deploy runs, any prior Save
+  // will have already written the new state to staging, making a live query
+  // return identical data and produce "No changes".
+  let before: { pkg: Package; modules: PackageModule[] } | null = baseline
 
-  const before = targetPkg
-    ? { pkg: targetPkg as Package, modules: (targetMods ?? []) as PackageModule[] }
-    : null
+  if (env === 'production') {
+    const [{ data: targetPkg }, { data: targetMods }] = await Promise.all([
+      targetDb.from('packages').select('*').eq('id', packageId).maybeSingle(),
+      targetDb.from('package_modules').select('*').eq('package_id', packageId),
+    ])
+    before = targetPkg
+      ? { pkg: targetPkg as Package, modules: (targetMods ?? []) as PackageModule[] }
+      : null
+  }
 
   const after = {
     pkg: payload as unknown as Package,

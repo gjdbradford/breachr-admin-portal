@@ -120,7 +120,10 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
   }
 
   async function handleDeploy(env: EnvName): Promise<{ error?: string }> {
-    const result = await saveAndDeployAction(buildPayload(), env)
+    const baseline = pkg
+      ? { pkg: pkg as unknown as import('@/lib/packages/types').Package, modules: pkg.modules }
+      : null
+    const result = await saveAndDeployAction(buildPayload(), env, baseline)
     setSaveError(result.error ?? null)
     return result
   }
