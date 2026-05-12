@@ -8,7 +8,7 @@ export default async function PricingSetsPage() {
     <>
       <div className="page-header">
         <div>
-          <div className="page-title">Pricing Sets</div>
+          <div className="page-title">Website Pricing</div>
           <div className="page-sub">Scheduled collections of pricing cards · A/B test variants</div>
         </div>
         <Link href="/dashboard/pricing-sets/new" className="btn-p">+ New Set</Link>

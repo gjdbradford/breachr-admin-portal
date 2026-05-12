@@ -39,7 +39,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <div className="nav-section" style={{ marginTop: 8 }}>Product Config</div>
           <Link href="/dashboard/packages" className="nav-item">⬡ Packages</Link>
-          <Link href="/dashboard/pricing-sets" className="nav-item">◫ Pricing Sets</Link>
+          <Link href="/dashboard/pricing-sets" className="nav-item">◫ Website Pricing</Link>
 
           <div className="nav-section" style={{ marginTop: 8 }}>Red Team</div>
           <Link href="/dashboard/redteam" className="nav-item">⚔ Engagements</Link>

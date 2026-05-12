@@ -6,24 +6,12 @@ import { toast } from 'sonner'
 import type { PricingSetDetail, PricingSetStatus, SavePricingSetPayload } from '@/lib/pricing-sets/types'
 import type { PackageListItem } from '@/lib/packages/types'
 import { savePricingSetAction } from './actions'
+import DateTimePicker from '@/components/DateTimePicker'
 
 type Props = {
   set: PricingSetDetail | null
   allPackages: PackageListItem[]
   isNew: boolean
-}
-
-function toLocalDatetimeValue(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function fromLocalDatetimeValue(v: string): string {
-  const [date, time] = v.split('T')
-  const [year, month, day] = date.split('-').map(Number)
-  const [hours, minutes] = time.split(':').map(Number)
-  return new Date(year, month - 1, day, hours, minutes).toISOString()
 }
 
 export default function SetEditorClient({ set, allPackages, isNew }: Props) {
@@ -35,11 +23,11 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
   const [name,        setName]        = useState(set?.name ?? '')
   const [description, setDescription] = useState(set?.description ?? '')
   const [status,      setStatus]      = useState<PricingSetStatus>(set?.status ?? 'draft')
-  const [activeFrom,  setActiveFrom]  = useState(
-    set ? toLocalDatetimeValue(set.active_from) : toLocalDatetimeValue(new Date().toISOString())
+  const [activeFrom,  setActiveFrom]  = useState<Date>(
+    set ? new Date(set.active_from) : new Date()
   )
-  const [activeTo,    setActiveTo]    = useState(
-    set?.active_to ? toLocalDatetimeValue(set.active_to) : ''
+  const [activeTo,    setActiveTo]    = useState<Date | null>(
+    set?.active_to ? new Date(set.active_to) : null
   )
 
   // Selected packages: ordered list of package_ids
@@ -79,8 +67,8 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
       name,
       description: description || null,
       status,
-      active_from: fromLocalDatetimeValue(activeFrom),
-      active_to: activeTo ? fromLocalDatetimeValue(activeTo) : null,
+      active_from: activeFrom.toISOString(),
+      active_to: activeTo ? activeTo.toISOString() : null,
       packages: selectedIds.map((pid, i) => ({ package_id: pid, display_order: i })),
     }
   }
@@ -111,7 +99,7 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
       {/* Header */}
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <a href="/dashboard/pricing-sets" style={{ fontSize: 12, color: '#475569', textDecoration: 'none' }}>← Pricing Sets</a>
+          <a href="/dashboard/pricing-sets" style={{ fontSize: 12, color: '#475569', textDecoration: 'none' }}>← Website Pricing</a>
           <span style={{ color: '#475569' }}>/</span>
           <span style={{ fontSize: 16, fontWeight: 700 }}>{isNew ? 'New Set' : name}</span>
           <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
@@ -156,13 +144,11 @@ export default function SetEditorClient({ set, allPackages, isNew }: Props) {
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active From</div>
-              <input type="datetime-local" value={activeFrom} onChange={e => { setActiveFrom(e.target.value); markDirty() }}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+              <DateTimePicker value={activeFrom} onChange={d => { if (d) { setActiveFrom(d); markDirty() } }} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active To <span style={{ color: '#334155', fontWeight: 400 }}>(blank = ∞)</span></div>
-              <input type="datetime-local" value={activeTo} onChange={e => { setActiveTo(e.target.value); markDirty() }}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+              <DateTimePicker value={activeTo} onChange={d => { setActiveTo(d); markDirty() }} placeholder="No end date (∞)" />
             </div>
           </div>
         </div>

@@ -5,24 +5,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { AbTestWithSets, AbTestStatus, SaveAbTestPayload, PricingSetListItem } from '@/lib/pricing-sets/types'
 import { saveAbTestAction, endAbTestAction } from './actions'
+import DateTimePicker from '@/components/DateTimePicker'
 
 type Props = {
   test: AbTestWithSets | null
   allSets: PricingSetListItem[]
   isNew: boolean
-}
-
-function toLocalDatetimeValue(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function fromLocalDatetimeValue(v: string): string {
-  const [date, time] = v.split('T')
-  const [year, month, day] = date.split('-').map(Number)
-  const [hours, minutes] = time.split(':').map(Number)
-  return new Date(year, month - 1, day, hours, minutes).toISOString()
 }
 
 export default function TestEditorClient({ test, allSets, isNew }: Props) {
@@ -37,11 +25,11 @@ export default function TestEditorClient({ test, allSets, isNew }: Props) {
   const [setBId,     setSetBId]     = useState(test?.set_b_id ?? '')
   const [split,      setSplit]      = useState(test?.traffic_split_a ?? 50)
   const [status,     setStatus]     = useState<AbTestStatus>(test?.status ?? 'draft')
-  const [activeFrom, setActiveFrom] = useState(
-    test ? toLocalDatetimeValue(test.active_from) : toLocalDatetimeValue(new Date().toISOString())
+  const [activeFrom, setActiveFrom] = useState<Date>(
+    test ? new Date(test.active_from) : new Date()
   )
-  const [activeTo,   setActiveTo]   = useState(
-    test?.active_to ? toLocalDatetimeValue(test.active_to) : ''
+  const [activeTo,   setActiveTo]   = useState<Date | null>(
+    test?.active_to ? new Date(test.active_to) : null
   )
 
   const setAOptions = allSets.filter(s => s.id !== setBId && s.status !== 'archived')
@@ -59,8 +47,8 @@ export default function TestEditorClient({ test, allSets, isNew }: Props) {
       set_b_id: setBId,
       traffic_split_a: split,
       status,
-      active_from: fromLocalDatetimeValue(activeFrom),
-      active_to: activeTo ? fromLocalDatetimeValue(activeTo) : null,
+      active_from: activeFrom.toISOString(),
+      active_to: activeTo ? activeTo.toISOString() : null,
     }
   }
 
@@ -95,7 +83,7 @@ export default function TestEditorClient({ test, allSets, isNew }: Props) {
     <div>
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <a href="/dashboard/pricing-sets" style={{ fontSize: 12, color: '#475569', textDecoration: 'none' }}>← Pricing Sets</a>
+          <a href="/dashboard/pricing-sets" style={{ fontSize: 12, color: '#475569', textDecoration: 'none' }}>← Website Pricing</a>
           <span style={{ color: '#475569' }}>/</span>
           <span style={{ fontSize: 16, fontWeight: 700 }}>{isNew ? 'New A/B Test' : name}</span>
           <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
@@ -174,13 +162,11 @@ export default function TestEditorClient({ test, allSets, isNew }: Props) {
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active From</div>
-              <input type="datetime-local" value={activeFrom} onChange={e => { setActiveFrom(e.target.value); markDirty() }}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+              <DateTimePicker value={activeFrom} onChange={d => { if (d) { setActiveFrom(d); markDirty() } }} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active To <span style={{ color: '#334155', fontWeight: 400 }}>(blank = ∞)</span></div>
-              <input type="datetime-local" value={activeTo} onChange={e => { setActiveTo(e.target.value); markDirty() }}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+              <DateTimePicker value={activeTo} onChange={d => { setActiveTo(d); markDirty() }} placeholder="No end date (∞)" />
             </div>
           </div>
         </div>
