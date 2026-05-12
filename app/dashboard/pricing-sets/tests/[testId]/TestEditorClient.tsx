@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import type { AbTestWithSets, AbTestStatus, SaveAbTestPayload, PricingSetListItem } from '@/lib/pricing-sets/types'
+import type { AbTestWithSets, AbTestStatus, SaveAbTestPayload, PricingSetListItem, AbTestAnalytics } from '@/lib/pricing-sets/types'
 import { saveAbTestAction, endAbTestAction } from './actions'
 import DateTimePicker from '@/components/DateTimePicker'
 
@@ -11,9 +11,10 @@ type Props = {
   test: AbTestWithSets | null
   allSets: PricingSetListItem[]
   isNew: boolean
+  analytics: AbTestAnalytics | null
 }
 
-export default function TestEditorClient({ test, allSets, isNew }: Props) {
+export default function TestEditorClient({ test, allSets, isNew, analytics }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [isEnding, setIsEnding] = useState(false)
@@ -182,6 +183,137 @@ export default function TestEditorClient({ test, allSets, isNew }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Analytics panel */}
+      {analytics && !isNew && (
+        <div style={{ marginTop: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              Analytics
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 10, color: '#334155' }}>{analytics.total_events.toLocaleString()} total events</span>
+              <button
+                onClick={() => router.refresh()}
+                style={{ fontSize: 10, color: '#42a5f5', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                ↻ Refresh
+              </button>
+            </div>
+          </div>
+
+          {analytics.total_events === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, fontSize: 12, color: '#475569' }}>
+              No events recorded yet. Visit <code style={{ color: '#94a3b8' }}>localhost:3000/pricing</code> to generate data.
+            </div>
+          ) : (
+            <>
+              {/* Stat comparison grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                {(['a', 'b'] as const).map(v => {
+                  const s = analytics[v]
+                  const other = analytics[v === 'a' ? 'b' : 'a']
+                  const setName = v === 'a'
+                    ? (allSets.find(s => s.id === test?.set_a_id)?.name ?? 'Set A')
+                    : (allSets.find(s => s.id === test?.set_b_id)?.name ?? 'Set B')
+                  const variantColor = v === 'a' ? '#42a5f5' : '#a78bfa'
+                  const ctrWinner = s.ctr > other.ctr
+                  const cvrWinner = s.cvr > other.cvr
+
+                  return (
+                    <div key={v} style={{ background: 'rgba(255,255,255,.02)', border: `1px solid ${variantColor}22`, borderRadius: 10, padding: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.1em', color: variantColor, background: `${variantColor}18`, border: `1px solid ${variantColor}33`, borderRadius: 4, padding: '2px 7px', textTransform: 'uppercase' }}>
+                          Set {v.toUpperCase()}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{setName}</span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+                        <Stat label="Views" value={s.views} color={variantColor} />
+                        <Stat label="CTA Clicks" value={s.clicks} color={variantColor} />
+                        <Stat label="Leads" value={s.leads} color={variantColor} />
+                      </div>
+
+                      <RateBar label="Click-through rate" rate={s.ctr} isWinner={ctrWinner} color={variantColor} />
+                      <RateBar label="Conversion rate" rate={s.cvr} isWinner={cvrWinner} color={variantColor} />
+
+                      {s.topPackages.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: '#334155', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 6 }}>Top package clicks</div>
+                          {s.topPackages.map(p => (
+                            <div key={p.slug} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#64748b', marginBottom: 3 }}>
+                              <span style={{ fontFamily: 'monospace', color: '#94a3b8' }}>{p.slug}</span>
+                              <span style={{ fontWeight: 700, color: variantColor }}>{p.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Head-to-head summary */}
+              <HeadToHead analytics={analytics} />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Stat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ textAlign: 'center', padding: '10px 8px', background: 'rgba(255,255,255,.02)', borderRadius: 8 }}>
+      <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
+      <div style={{ fontSize: 9, color: '#475569', marginTop: 4, fontWeight: 600, letterSpacing: '.05em', textTransform: 'uppercase' }}>{label}</div>
+    </div>
+  )
+}
+
+function RateBar({ label, rate, isWinner, color }: { label: string; rate: number; isWinner: boolean; color: string }) {
+  const pct = Math.round(rate * 100)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{ fontSize: 10, color: '#475569' }}>{label}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: isWinner ? '#22c55e' : '#475569' }}>
+          {pct}%{isWinner ? ' ↑' : ''}
+        </span>
+      </div>
+      <div style={{ height: 4, background: 'rgba(255,255,255,.06)', borderRadius: 2, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: isWinner ? '#22c55e' : color, borderRadius: 2, transition: 'width .4s ease' }} />
+      </div>
+    </div>
+  )
+}
+
+function HeadToHead({ analytics }: { analytics: AbTestAnalytics }) {
+  const { a, b } = analytics
+  const totalViews = a.views + b.views
+  const ctrDiff = ((a.ctr - b.ctr) * 100).toFixed(1)
+  const cvrDiff = ((a.cvr - b.cvr) * 100).toFixed(1)
+  const aWinsCtr = a.ctr > b.ctr
+  const aWinsCvr = a.cvr > b.cvr
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 11, color: '#64748b' }}>
+      <span><strong style={{ color: '#94a3b8' }}>Total visitors:</strong> {totalViews.toLocaleString()}</span>
+      <span>
+        <strong style={{ color: '#94a3b8' }}>CTR:</strong>{' '}
+        <span style={{ color: aWinsCtr ? '#42a5f5' : '#a78bfa', fontWeight: 700 }}>
+          {aWinsCtr ? 'A' : 'B'} leads by {Math.abs(Number(ctrDiff))}pp
+        </span>
+      </span>
+      <span>
+        <strong style={{ color: '#94a3b8' }}>Conversion:</strong>{' '}
+        <span style={{ color: aWinsCvr ? '#42a5f5' : '#a78bfa', fontWeight: 700 }}>
+          {aWinsCvr ? 'A' : 'B'} leads by {Math.abs(Number(cvrDiff))}pp
+        </span>
+      </span>
+      <span><strong style={{ color: '#94a3b8' }}>Total leads:</strong> {(a.leads + b.leads).toLocaleString()}</span>
     </div>
   )
 }

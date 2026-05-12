@@ -67,3 +67,18 @@ export interface SaveAbTestPayload {
   active_from: string
   active_to: string | null
 }
+
+export interface AbTestVariantStats {
+  views: number
+  clicks: number
+  leads: number
+  ctr: number        // clicks / views
+  cvr: number        // leads / views
+  topPackages: { slug: string; count: number }[]
+}
+
+export interface AbTestAnalytics {
+  a: AbTestVariantStats
+  b: AbTestVariantStats
+  total_events: number
+}

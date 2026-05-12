@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type {
   PricingSet, PricingSetDetail, PricingSetListItem, PricingSetPackage,
   PricingSetStatus, AbTest, AbTestWithSets, SavePricingSetPayload, SaveAbTestPayload,
+  AbTestAnalytics, AbTestVariantStats,
 } from './types'
 
 function isLive(row: { active_from: string; active_to: string | null; status: string }): boolean {
@@ -113,6 +114,43 @@ export async function setPricingSetStatus(id: string, status: PricingSetStatus):
   const db = createServiceClient()
   const { error } = await db.from('pricing_sets').update({ status }).eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export async function getAbTestAnalytics(testId: string): Promise<AbTestAnalytics> {
+  const db = createServiceClient()
+  const { data: events } = await db
+    .from('pricing_set_events')
+    .select('variant, event_type, package_slug, session_id')
+    .eq('ab_test_id', testId)
+
+  const rows = (events ?? []) as { variant: string; event_type: string; package_slug: string | null; session_id: string }[]
+
+  function variantStats(v: 'a' | 'b'): AbTestVariantStats {
+    const vRows = rows.filter(r => r.variant === v)
+    const views = new Set(vRows.filter(r => r.event_type === 'view').map(r => r.session_id)).size
+    const clicks = vRows.filter(r => r.event_type === 'cta_click').length
+    const leads = vRows.filter(r => r.event_type === 'lead_submitted').length
+
+    const pkgMap = new Map<string, number>()
+    for (const r of vRows.filter(r => r.event_type === 'cta_click' && r.package_slug)) {
+      pkgMap.set(r.package_slug!, (pkgMap.get(r.package_slug!) ?? 0) + 1)
+    }
+    const topPackages = [...pkgMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([slug, count]) => ({ slug, count }))
+
+    return {
+      views,
+      clicks,
+      leads,
+      ctr: views > 0 ? clicks / views : 0,
+      cvr: views > 0 ? leads / views : 0,
+      topPackages,
+    }
+  }
+
+  return { a: variantStats('a'), b: variantStats('b'), total_events: rows.length }
 }
 
 export async function clonePricingSet(id: string): Promise<string> {
