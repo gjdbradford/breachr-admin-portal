@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
   savePackageFull, saveAndPushToEnv, pushPackageToEnv, redactPushLogEntry,
-  setPackageStatus, reassignTenant,
+  setPackageStatus, reassignTenant, reorderPackages,
 } from '@/lib/packages/db'
 import type { SavePackagePayload, EnvName, Package, PackageModule } from '@/lib/packages/types'
 
@@ -65,6 +65,15 @@ export async function archivePackageAction(packageId: string): Promise<void> {
 export async function restorePackageAction(packageId: string): Promise<void> {
   await setPackageStatus(packageId, 'active')
   redirect('/dashboard/packages')
+}
+
+export async function reorderPackagesAction(orderedIds: string[]): Promise<{ error?: string }> {
+  try {
+    await reorderPackages(orderedIds)
+    return {}
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Reorder failed' }
+  }
 }
 
 export async function reassignTenantAction(tenantId: string, newPackageId: string): Promise<{ error?: string }> {

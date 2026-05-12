@@ -1,10 +1,11 @@
 import type { Package, PackageModule } from './types'
 
-type TrackedField = 'name' | 'price_monthly' | 'price_annual' | 'scans_limit' | 'tokens_limit' | 'targets_limit' | 'status'
+type TrackedField = 'name' | 'price_monthly' | 'price_annual' | 'scans_limit' | 'tokens_limit' | 'targets_limit' | 'status' | 'badge' | 'cta_label'
 
 const TRACKED_FIELDS: TrackedField[] = [
   'name', 'price_monthly', 'price_annual',
   'scans_limit', 'tokens_limit', 'targets_limit', 'status',
+  'badge', 'cta_label',
 ]
 
 export function buildChangesSummary(
@@ -20,6 +21,19 @@ export function buildChangesSummary(
     const av = after.pkg[field]
     if (bv !== av) {
       parts.push(`${field} ${bv ?? 'null'}→${av ?? 'null'}`)
+    }
+  }
+
+  // Features: compare by serialising — items rarely change so full JSON diff is fine
+  const beforeFeatures = JSON.stringify(before.pkg.features ?? [])
+  const afterFeatures  = JSON.stringify(after.pkg.features ?? [])
+  if (beforeFeatures !== afterFeatures) {
+    const bc = (before.pkg.features ?? []).length
+    const ac = (after.pkg.features ?? []).length
+    if (ac !== bc) {
+      parts.push(`features ${bc}→${ac} items`)
+    } else {
+      parts.push(`features updated (${ac} items)`)
     }
   }
 
