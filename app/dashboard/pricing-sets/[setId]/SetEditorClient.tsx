@@ -1,0 +1,212 @@
+'use client'
+
+import { useState, useTransition, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import type { PricingSetDetail, PricingSetStatus, SavePricingSetPayload } from '@/lib/pricing-sets/types'
+import type { PackageListItem } from '@/lib/packages/types'
+import { savePricingSetAction } from './actions'
+
+type Props = {
+  set: PricingSetDetail | null
+  allPackages: PackageListItem[]
+  isNew: boolean
+}
+
+function toLocalDatetimeValue(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function fromLocalDatetimeValue(v: string): string {
+  return new Date(v).toISOString()
+}
+
+export default function SetEditorClient({ set, allPackages, isNew }: Props) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+  const [isDirty, setIsDirty] = useState(false)
+  const markDirty = () => setIsDirty(true)
+
+  const [name,        setName]        = useState(set?.name ?? '')
+  const [description, setDescription] = useState(set?.description ?? '')
+  const [status,      setStatus]      = useState<PricingSetStatus>(set?.status ?? 'draft')
+  const [activeFrom,  setActiveFrom]  = useState(
+    set ? toLocalDatetimeValue(set.active_from) : toLocalDatetimeValue(new Date().toISOString())
+  )
+  const [activeTo,    setActiveTo]    = useState(
+    set?.active_to ? toLocalDatetimeValue(set.active_to) : ''
+  )
+
+  // Selected packages: ordered list of package_ids
+  const initSelected = (set?.packages ?? [])
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(p => p.package_id)
+  const [selectedIds, setSelectedIds] = useState<string[]>(initSelected)
+
+  // Drag-to-reorder for selected packages
+  const dragIdx = useRef<number | null>(null)
+
+  function togglePackage(pkgId: string) {
+    setSelectedIds(prev =>
+      prev.includes(pkgId) ? prev.filter(id => id !== pkgId) : [...prev, pkgId]
+    )
+    markDirty()
+  }
+
+  function onDragStart(idx: number) { dragIdx.current = idx }
+  function onDragEnter(idx: number) {
+    if (dragIdx.current === null || dragIdx.current === idx) return
+    const next = [...selectedIds]
+    const [moved] = next.splice(dragIdx.current, 1)
+    next.splice(idx, 0, moved)
+    dragIdx.current = idx
+    setSelectedIds(next)
+  }
+  function onDragEnd() { dragIdx.current = null }
+
+  function buildPayload(): SavePricingSetPayload {
+    return {
+      id: set?.id ?? null,
+      name,
+      description: description || null,
+      status,
+      active_from: fromLocalDatetimeValue(activeFrom),
+      active_to: activeTo ? fromLocalDatetimeValue(activeTo) : null,
+      packages: selectedIds.map((pid, i) => ({ package_id: pid, display_order: i })),
+    }
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await savePricingSetAction(buildPayload())
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        setIsDirty(false)
+        toast.success('Set saved')
+        if (isNew) router.push(`/dashboard/pricing-sets/${result.id}`)
+      }
+    })
+  }
+
+  const selectedPackages = selectedIds
+    .map(id => allPackages.find(p => p.id === id)!)
+    .filter(Boolean)
+
+  const STATUS_BADGE: Record<PricingSetStatus, string> = {
+    active: 'badge-green', draft: 'badge-grey', archived: 'badge-red',
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a href="/dashboard/pricing-sets" style={{ fontSize: 12, color: '#475569', textDecoration: 'none' }}>← Pricing Sets</a>
+          <span style={{ color: '#475569' }}>/</span>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>{isNew ? 'New Set' : name}</span>
+          <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isDirty && <span style={{ fontSize: 11, color: '#f59e0b' }}>Unsaved changes</span>}
+          <button className="btn-p" onClick={handleSave} disabled={isPending}>
+            {isPending ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        {/* Left: metadata */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Name</div>
+            <input value={name} onChange={e => { setName(e.target.value); markDirty() }}
+              placeholder="e.g. Spring 2026 Pricing"
+              style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Description</div>
+            <textarea value={description} onChange={e => { setDescription(e.target.value); markDirty() }}
+              rows={2} placeholder="Optional internal note"
+              style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#e2e8f0', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Status</div>
+              <select value={status} onChange={e => { setStatus(e.target.value as PricingSetStatus); markDirty() }}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none' }}>
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active From</div>
+              <input type="datetime-local" value={activeFrom} onChange={e => { setActiveFrom(e.target.value); markDirty() }}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>Active To <span style={{ color: '#334155', fontWeight: 400 }}>(blank = ∞)</span></div>
+              <input type="datetime-local" value={activeTo} onChange={e => { setActiveTo(e.target.value); markDirty() }}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 12, borderRadius: 6, border: '1px solid rgba(255,255,255,.1)', background: '#0f172a', color: '#e2e8f0', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Right: package picker */}
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Packages in This Set</div>
+
+          {/* All available packages — toggle to include */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+            {allPackages.map(pkg => {
+              const included = selectedIds.includes(pkg.id)
+              return (
+                <div key={pkg.id}
+                  onClick={() => togglePackage(pkg.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: `1px solid ${included ? 'rgba(66,165,245,.3)' : 'rgba(255,255,255,.06)'}`, background: included ? 'rgba(66,165,245,.06)' : 'rgba(255,255,255,.02)', cursor: 'pointer' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${included ? '#42a5f5' : '#334155'}`, background: included ? '#42a5f5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 10, color: '#0f172a', fontWeight: 900 }}>
+                    {included ? '✓' : ''}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{pkg.name}</div>
+                    <div style={{ fontSize: 10, color: '#475569' }}>€{pkg.price_monthly}/mo · {pkg.slug}</div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Ordered list with drag handles */}
+          {selectedPackages.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>Display Order (drag to reorder)</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {selectedPackages.map((pkg, idx) => (
+                  <div key={pkg.id}
+                    draggable
+                    onDragStart={() => onDragStart(idx)}
+                    onDragEnter={() => onDragEnter(idx)}
+                    onDragEnd={onDragEnd}
+                    onDragOver={e => e.preventDefault()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)', cursor: 'grab' }}>
+                    <span style={{ color: '#334155', fontSize: 13, userSelect: 'none' }}>⠿</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0', flex: 1 }}>{idx + 1}. {pkg.name}</span>
+                    <span style={{ fontSize: 10, color: '#475569' }}>€{pkg.price_monthly}/mo</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
