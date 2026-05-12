@@ -86,7 +86,7 @@ export async function savePackageFull(payload: SavePackagePayload): Promise<stri
     name: payload.name,
     slug: payload.slug,
     description: payload.description,
-    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_monthly: payload.is_poa ? 0 : (payload.price_monthly ?? 0),
     price_annual: payload.is_poa ? null : payload.price_annual,
     is_poa: payload.is_poa,
     scans_limit: payload.scans_limit,
@@ -158,7 +158,7 @@ export async function pushPackageToEnv(
 
   const deployedConfig = {
     name: detail.name, slug: detail.slug, description: detail.description,
-    price_monthly: detail.is_poa ? null : detail.price_monthly,
+    price_monthly: detail.is_poa ? 0 : (detail.price_monthly ?? 0),
     price_annual: detail.is_poa ? null : detail.price_annual,
     is_poa: detail.is_poa ?? false,
     features: detail.features, badge: detail.badge, cta_label: detail.cta_label,
@@ -172,7 +172,7 @@ export async function pushPackageToEnv(
       name: detail.name,
       slug: detail.slug,
       description: detail.description,
-      price_monthly: detail.is_poa ? null : detail.price_monthly,
+      price_monthly: detail.is_poa ? 0 : (detail.price_monthly ?? 0),
       price_annual: detail.is_poa ? null : detail.price_annual,
       is_poa: detail.is_poa ?? false,
       scans_limit: detail.scans_limit,
@@ -277,7 +277,7 @@ export async function saveAndPushToEnv(
 
   const deployedConfig = {
     name: payload.name, slug: payload.slug, description: payload.description,
-    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_monthly: payload.is_poa ? 0 : (payload.price_monthly ?? 0),
     price_annual: payload.is_poa ? null : payload.price_annual,
     is_poa: payload.is_poa,
     features: payload.features, badge: payload.badge, cta_label: payload.cta_label,
@@ -286,7 +286,7 @@ export async function saveAndPushToEnv(
   const { error: upsertErr } = await targetDb.from('packages').upsert({
     id: packageId,
     name: payload.name, slug: payload.slug, description: payload.description,
-    price_monthly: payload.is_poa ? null : payload.price_monthly,
+    price_monthly: payload.is_poa ? 0 : (payload.price_monthly ?? 0),
     price_annual: payload.is_poa ? null : payload.price_annual,
     is_poa: payload.is_poa,
     scans_limit: payload.scans_limit, tokens_limit: payload.tokens_limit,
