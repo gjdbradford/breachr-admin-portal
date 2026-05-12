@@ -129,9 +129,7 @@ export default function PackageEditorClient({ pkg, allPackages, allPermissions, 
     active: 'badge-green', draft: 'badge-grey', archived: 'badge-red',
   }
 
-  const isSaved = Boolean(pkg?.id)
-  const hasModulesConfigured = moduleSlugList.some(s => moduleModes[s].mode !== 'off')
-  const deploymentReady = isSaved && Boolean(name) && Boolean(slug) && hasModulesConfigured
+  const deploymentReady = Boolean(pkg?.id) && Boolean(name) && Boolean(slug)
 
   const TABS = ['Basics', 'Modules', 'Role Ceilings', `Tenants (${pkg?.tenant_count ?? 0})`, 'Analytics', ...(deploymentReady ? ['Deployment'] : [])]
 
