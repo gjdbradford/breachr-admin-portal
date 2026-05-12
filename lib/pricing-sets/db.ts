@@ -2,7 +2,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type {
   PricingSet, PricingSetDetail, PricingSetListItem, PricingSetPackage,
-  AbTest, AbTestWithSets, SavePricingSetPayload, SaveAbTestPayload,
+  PricingSetStatus, AbTest, AbTestWithSets, SavePricingSetPayload, SaveAbTestPayload,
 } from './types'
 
 function isLive(row: { active_from: string; active_to: string | null; status: string }): boolean {
@@ -107,4 +107,36 @@ export async function endAbTest(id: string): Promise<void> {
   const db = createServiceClient()
   const { error } = await db.from('ab_tests').update({ status: 'ended' }).eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export async function setPricingSetStatus(id: string, status: PricingSetStatus): Promise<void> {
+  const db = createServiceClient()
+  const { error } = await db.from('pricing_sets').update({ status }).eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function clonePricingSet(id: string): Promise<string> {
+  const db = createServiceClient()
+  const source = await getPricingSet(id)
+  if (!source) throw new Error('Set not found')
+
+  const { data, error } = await db
+    .from('pricing_sets')
+    .insert({
+      name: `Copy of ${source.name}`,
+      description: source.description,
+      status: 'draft' as PricingSetStatus,
+      active_from: source.active_from,
+      active_to: source.active_to,
+    })
+    .select('id')
+    .single()
+  if (error || !data) throw new Error(error?.message ?? 'Clone failed')
+
+  if (source.packages.length > 0) {
+    await db.from('pricing_set_packages').insert(
+      source.packages.map(p => ({ set_id: data.id, package_id: p.package_id, display_order: p.display_order }))
+    )
+  }
+  return data.id
 }
