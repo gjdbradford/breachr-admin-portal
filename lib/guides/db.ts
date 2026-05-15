@@ -95,11 +95,13 @@ export async function deleteGuideStep(id: string): Promise<void> {
 
 export async function reorderGuideSteps(guideSetId: string, orderedIds: string[]): Promise<void> {
   const admin = createServiceClient()
-  await Promise.all(
+  const results = await Promise.all(
     orderedIds.map((id, idx) =>
       admin.from('guide_steps').update({ step_order: idx + 1 }).eq('id', id).eq('guide_set_id', guideSetId)
     )
   )
+  const failed = results.find(r => r.error)
+  if (failed?.error) throw new Error(failed.error.message)
 }
 
 export async function getGuideStats(guideSetId: string): Promise<GuideStats> {
