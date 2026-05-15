@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   saveGuideSetAction, deleteGuideSetAction,
-  saveGuideStepAction, deleteGuideStepAction, reorderGuideStepsAction,
+  saveGuideStepAction, deleteGuideStepAction,
 } from './actions'
 import type { GuideSetRow, GuideStepRow, GuideStats } from '@/lib/guides/db'
 
